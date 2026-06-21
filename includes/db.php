@@ -133,6 +133,36 @@ try {
         $stmt_insert = $pdo->prepare("INSERT INTO users (username, password, name) VALUES (?, ?, ?)");
         $stmt_insert->execute([$admin_user, $admin_pass_hash, $admin_name]);
     }
+
+    // Initialize site settings table and seeds
+    $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings (
+        setting_key VARCHAR(100) PRIMARY KEY,
+        setting_value TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    
+    $settings_count = $pdo->query("SELECT COUNT(*) FROM site_settings")->fetchColumn();
+    if ($settings_count == 0) {
+        $pdo->exec("INSERT INTO site_settings (setting_key, setting_value) VALUES 
+            ('system_name', 'BYC DATA CENTER'),
+            ('organization_name', 'Beersheba Youth Church'),
+            ('contact_email', 'info@byc.org'),
+            ('contact_phone', '0241112222'),
+            ('currency', 'GH₵'),
+            ('timezone', 'Africa/Accra'),
+            ('logo_path', '');");
+    } else {
+        // Ensure logo_path key exists for older initialized databases
+        $stmt_logo_chk = $pdo->query("SELECT COUNT(*) FROM site_settings WHERE setting_key = 'logo_path'");
+        if ($stmt_logo_chk->fetchColumn() == 0) {
+            $pdo->exec("INSERT INTO site_settings (setting_key, setting_value) VALUES ('logo_path', '')");
+        }
+    }
+    
+    $GLOBALS['site_settings'] = [];
+    $settings_rows = $pdo->query("SELECT * FROM site_settings")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($settings_rows as $row) {
+        $GLOBALS['site_settings'][$row['setting_key']] = $row['setting_value'];
+    }
     
 } catch (PDOException $e) {
     $error_msg = $is_dev ? $e->getMessage() : "Please contact the system administrator.";

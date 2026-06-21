@@ -2,6 +2,11 @@
 // layout.php - Master layout rendering helper for BYC Data Center
 
 function render_header($title, $active_page = 'dashboard') {
+    $settings = $GLOBALS['site_settings'] ?? [];
+    $sys_name = $settings['system_name'] ?? 'BYC DATA CENTER';
+    $sys_abbr = !empty($sys_name) ? substr($sys_name, 0, 1) : 'B';
+    $org_name = $settings['organization_name'] ?? 'Beersheba Youth Church';
+
     $nav_items = [
         'dashboard' => ['label' => 'Dashboard', 'url' => 'index', 'icon' => '<svg class="nav-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"></path></svg>'],
         'members' => ['label' => 'Members', 'url' => 'members', 'icon' => '<svg class="nav-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>'],
@@ -27,7 +32,7 @@ function render_header($title, $active_page = 'dashboard') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BYC Data Center - <?= htmlspecialchars($title) ?></title>
+    <title><?= htmlspecialchars($sys_name) ?> - <?= htmlspecialchars($title) ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -35,8 +40,12 @@ function render_header($title, $active_page = 'dashboard') {
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
         <div class="logo-container">
-            <div class="logo-icon">B</div>
-            <span class="logo-text">BYC DATA CENTER</span>
+            <?php if (!empty($settings['logo_path']) && file_exists(dirname(__DIR__) . '/' . $settings['logo_path'])): ?>
+                <img src="<?= htmlspecialchars($settings['logo_path']) ?>" alt="Logo" class="logo-img" style="width: 2.5rem; height: 2.5rem; object-fit: contain;">
+            <?php else: ?>
+                <div class="logo-icon"><?= htmlspecialchars($sys_abbr) ?></div>
+            <?php endif; ?>
+            <span class="logo-text"><?= htmlspecialchars($sys_name) ?></span>
         </div>
         <ul class="nav-links">
             <?php foreach ($nav_items as $key => $item): ?>
@@ -49,15 +58,19 @@ function render_header($title, $active_page = 'dashboard') {
             <?php endforeach; ?>
         </ul>
         <div class="sidebar-footer">
-            BYC Data Center v1.0<br>&copy; <?= date('Y') ?>
+            <?= htmlspecialchars($org_name) ?><br>&copy; <?= date('Y') ?>
         </div>
     </aside>
 
     <!-- Mobile Fixed Header -->
     <div class="mobile-header">
         <div class="logo-container" style="margin-bottom: 0;">
-            <div class="logo-icon" style="width: 2rem; height: 2rem; font-size: 1rem; box-shadow: none;">B</div>
-            <span class="logo-text" style="font-size: 1.1rem;">BYC</span>
+            <?php if (!empty($settings['logo_path']) && file_exists(dirname(__DIR__) . '/' . $settings['logo_path'])): ?>
+                <img src="<?= htmlspecialchars($settings['logo_path']) ?>" alt="Logo" class="logo-img" style="width: 2rem; height: 2rem; object-fit: contain;">
+            <?php else: ?>
+                <div class="logo-icon" style="width: 2rem; height: 2rem; font-size: 1rem; box-shadow: none;"><?= htmlspecialchars($sys_abbr) ?></div>
+            <?php endif; ?>
+            <span class="logo-text" style="font-size: 1.1rem;"><?= htmlspecialchars($sys_name) ?></span>
         </div>
         <button class="mobile-menu-btn" onclick="toggleMobileDrawer()">
             <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -70,8 +83,12 @@ function render_header($title, $active_page = 'dashboard') {
     <div class="mobile-drawer" id="mobileDrawer">
         <div class="mobile-drawer-header">
             <div class="logo-container" style="margin-bottom: 0;">
-                <div class="logo-icon" style="width: 2.25rem; height: 2.25rem; font-size: 1.1rem;">B</div>
-                <span class="logo-text" style="font-size: 1.2rem;">BYC DATA CENTER</span>
+                <?php if (!empty($settings['logo_path']) && file_exists(dirname(__DIR__) . '/' . $settings['logo_path'])): ?>
+                    <img src="<?= htmlspecialchars($settings['logo_path']) ?>" alt="Logo" class="logo-img" style="width: 2.25rem; height: 2.25rem; object-fit: contain;">
+                <?php else: ?>
+                    <div class="logo-icon" style="width: 2.25rem; height: 2.25rem; font-size: 1.1rem;"><?= htmlspecialchars($sys_abbr) ?></div>
+                <?php endif; ?>
+                <span class="logo-text" style="font-size: 1.2rem;"><?= htmlspecialchars($sys_name) ?></span>
             </div>
             <button class="mobile-menu-btn" onclick="toggleMobileDrawer()" style="font-size: 1.8rem; line-height: 1; color: var(--text-muted); background: none; border: none; padding: 0;">&times;</button>
         </div>
@@ -86,7 +103,7 @@ function render_header($title, $active_page = 'dashboard') {
             <?php endforeach; ?>
         </ul>
         <div style="margin-top: auto; padding-top: 1.5rem; text-align: center; font-size: 0.75rem; color: var(--text-muted); border-top: 0.0625rem solid var(--border-color);">
-            BYC Data Center v1.0<br>&copy; <?= date('Y') ?>
+            <?= htmlspecialchars($org_name) ?><br>&copy; <?= date('Y') ?>
         </div>
     </div>
 

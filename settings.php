@@ -112,56 +112,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
         }
     }
     
-    // Reset Database
-    elseif ($action === 'reset_db') {
-        try {
-            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-            $pdo->exec("DROP TABLE IF EXISTS member_attendance;");
-            $pdo->exec("DROP TABLE IF EXISTS attendance;");
-            $pdo->exec("DROP TABLE IF EXISTS members;");
-            $pdo->exec("DROP TABLE IF EXISTS departments;");
-            $pdo->exec("DROP TABLE IF EXISTS services;");
-            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
-
-            $schema_file = __DIR__ . '/database/schema.sql';
-            if (file_exists($schema_file)) {
-                $sql = file_get_contents($schema_file);
-                $pdo->exec($sql);
+    // Update Site Settings
+    elseif ($action === 'update_settings') {
+        $system_name = trim($_POST['system_name'] ?? '');
+        $organization_name = trim($_POST['organization_name'] ?? '');
+        $contact_email = trim($_POST['contact_email'] ?? '');
+        $contact_phone = trim($_POST['contact_phone'] ?? '');
+        $currency = trim($_POST['currency'] ?? '');
+        $timezone = trim($_POST['timezone'] ?? '');
+        
+        if (empty($system_name) || empty($organization_name)) {
+            $error = 'System name and organization name are required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("UPDATE site_settings SET setting_value = ? WHERE setting_key = ?");
+                $stmt->execute([$system_name, 'system_name']);
+                $stmt->execute([$organization_name, 'organization_name']);
+                $stmt->execute([$contact_email, 'contact_email']);
+                $stmt->execute([$contact_phone, 'contact_phone']);
+                $stmt->execute([$currency, 'currency']);
+                $stmt->execute([$timezone, 'timezone']);
                 
-                // Seed members
-                $pdo->exec("INSERT INTO members (name, phone, email, address, birthday, gender, join_date, department_id) VALUES 
-                    ('Alesha Cole', '0241112222', 'alesha@byc.org', 'Accra, Ghana', '1998-05-12', 'Female', '2024-01-10', 1),
-                    ('David Boateng', '0243334444', 'david@byc.org', 'Kumasi, Ghana', '1995-11-20', 'Male', '2023-06-15', 2),
-                    ('Emmanuel Mensah', '0245556666', 'emmanuel@byc.org', 'Tema, Ghana', '2000-03-08', 'Male', '2025-02-01', 3),
-                    ('Sampson Tetteh', '0207778888', 'sampson@byc.org', 'Accra, Ghana', '1993-02-14', 'Male', '2022-04-10', 5),
-                    ('Rebecca Larbi', '0209990000', 'rebecca@byc.org', 'Cape Coast, Ghana', '1997-09-22', 'Female', '2021-08-11', 5);");
+                // Refresh global array in memory
+                $GLOBALS['site_settings']['system_name'] = $system_name;
+                $GLOBALS['site_settings']['organization_name'] = $organization_name;
+                $GLOBALS['site_settings']['contact_email'] = $contact_email;
+                $GLOBALS['site_settings']['contact_phone'] = $contact_phone;
+                $GLOBALS['site_settings']['currency'] = $currency;
+                $GLOBALS['site_settings']['timezone'] = $timezone;
 
-                $pdo->exec("INSERT INTO services (name, description) VALUES ('Youth Mega Rally', 'Annual large scale youth cell assembly');");
+                // Handle logo removal
+                if (isset($_POST['remove_logo']) && $_POST['remove_logo'] == '1') {
+                    $old_logo = $GLOBALS['site_settings']['logo_path'] ?? '';
+                    if (!empty($old_logo) && file_exists(__DIR__ . '/' . $old_logo)) {
+                        @unlink(__DIR__ . '/' . $old_logo);
+                    }
+                    $stmt_logo = $pdo->prepare("UPDATE site_settings SET setting_value = '' WHERE setting_key = 'logo_path'");
+                    $stmt_logo->execute();
+                    $GLOBALS['site_settings']['logo_path'] = '';
+                }
 
-                $sunday_service_id = $pdo->query("SELECT id FROM services WHERE name = 'Sunday Worship Service'")->fetchColumn();
-                $mega_rally_id = $pdo->query("SELECT id FROM services WHERE name = 'Youth Mega Rally'")->fetchColumn();
-
-                $pdo->exec("INSERT INTO attendance (service_id, date) VALUES ($sunday_service_id, DATE_SUB(CURDATE(), INTERVAL 3 DAY));");
-                $pdo->exec("INSERT INTO attendance (service_id, date) VALUES ($mega_rally_id, DATE_SUB(CURDATE(), INTERVAL 8 MONTH));");
-
-                $pdo->exec("INSERT INTO member_attendance (member_id, attendance_id, status) VALUES 
-                    (1, 1, 'Present'),
-                    (2, 1, 'Present'),
-                    (3, 1, 'Present'),
-                    (4, 1, 'Absent'),
-                    (5, 1, 'Absent');");
-
-                $pdo->exec("INSERT INTO member_attendance (member_id, attendance_id, status) VALUES 
-                    (1, 2, 'Present'),
-                    (2, 2, 'Present'),
-                    (3, 2, 'Present'),
-                    (4, 2, 'Present'),
-                    (5, 2, 'Present');");
+                // Handle logo upload
+                if (isset($_FILES['logo_image']) && $_FILES['logo_image']['error'] === UPLOAD_ERR_OK) {
+                    $file_tmp = $_FILES['logo_image']['tmp_name'];
+                    $file_name = $_FILES['logo_image']['name'];
+                    $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                    $allowed_exts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+                    
+                    if (in_array($ext, $allowed_exts)) {
+                        $target_dir = __DIR__ . '/assets/';
+                        if (!file_exists($target_dir)) {
+                            mkdir($target_dir, 0755, true);
+                        }
+                        
+                        // Remove old logo files to prevent clutter
+                        foreach (glob($target_dir . 'logo_uploaded.*') as $old_file) {
+                            @unlink($old_file);
+                        }
+                        
+                        $new_filename = 'logo_uploaded.' . $ext;
+                        $dest_path = $target_dir . $new_filename;
+                        
+                        if (move_uploaded_file($file_tmp, $dest_path)) {
+                            $logo_rel_path = 'assets/' . $new_filename;
+                            $stmt_logo = $pdo->prepare("UPDATE site_settings SET setting_value = ? WHERE setting_key = 'logo_path'");
+                            $stmt_logo->execute([$logo_rel_path]);
+                            $GLOBALS['site_settings']['logo_path'] = $logo_rel_path;
+                        }
+                    } else {
+                        $error = 'Invalid logo format. Only PNG, JPG, JPEG, GIF, WEBP, and SVG are allowed.';
+                    }
+                }
+                
+                if (empty($error)) {
+                    header("Location: settings?tab=system&msg=Site settings updated successfully");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error = 'Error updating site settings: ' . $e->getMessage();
             }
-            header("Location: settings?tab=system&msg=Database re-initialized to clean seeded defaults");
-            exit;
-        } catch (PDOException $e) {
-            $error = 'Error resetting database: ' . $e->getMessage();
         }
     }
 }
@@ -255,7 +284,7 @@ render_header('Settings & Administration', 'settings');
     <button class="settings-tab-btn <?= $active_tab === 'services' ? 'active' : '' ?>" onclick="switchTab('services')">Service Types</button>
     <button class="settings-tab-btn <?= $active_tab === 'departments' ? 'active' : '' ?>" onclick="switchTab('departments')">Departments</button>
     <button class="settings-tab-btn <?= $active_tab === 'users' ? 'active' : '' ?>" onclick="switchTab('users')">User Accounts</button>
-    <button class="settings-tab-btn <?= $active_tab === 'system' ? 'active' : '' ?>" onclick="switchTab('system')">System Control</button>
+    <button class="settings-tab-btn <?= $active_tab === 'system' ? 'active' : '' ?>" onclick="switchTab('system')">Site Settings</button>
 </div>
 
 <!-- Tab 1: Service Types Management -->
@@ -450,33 +479,66 @@ render_header('Settings & Administration', 'settings');
     </div>
 </div>
 
-<!-- Tab 4: System Reset Control -->
+<!-- Tab 4: Site Settings -->
 <div id="tabContent-system" class="settings-tab-content <?= $active_tab === 'system' ? 'active' : '' ?>">
-    <div style="max-width: 37.5rem; margin: 0 auto;">
-        <div class="card-panel" style="border-color: rgba(239, 68, 68, 0.2); background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), transparent);">
-            <div class="panel-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
-                <h2 class="panel-title" style="color: var(--danger); display: flex; align-items: center; gap: 0.5rem;">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                    Danger Zone: Reset Database
+    <div style="max-width: 40rem; margin: 0 auto;">
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Configure Application Settings
                 </h2>
             </div>
             
-            <p style="font-size: 0.95rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 1.25rem;">
-                Performing a database reset will drop all existing tables and re-initialize the schema. This action will:
-            </p>
-            <ul style="font-size: 0.85rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 1.5rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                <li>Permanently delete all custom service types, departments, and active member profiles.</li>
-                <li>Clear all logged attendance session histories.</li>
-                <li>Restore the system to clean, pre-seeded default profiles (5 members, 5 departments, 4 services, and 2 historical attendances) to facilitate demonstration.</li>
-            </ul>
-            
-            <div style="background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: var(--radius-sm); border: 0.0625rem solid var(--border-color); margin-bottom: 1.5rem; font-size: 0.8rem; color: var(--text-muted);">
-                <strong>Note:</strong> This process happens locally on the server. If you want to keep your data, please manually duplicate `byc_church.db` before resetting.
-            </div>
+            <form method="POST" action="settings?action=update_settings">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="setSystemName">System Name</label>
+                        <input type="text" name="system_name" id="setSystemName" required value="<?= htmlspecialchars($GLOBALS['site_settings']['system_name'] ?? '') ?>" placeholder="e.g. BYC DATA CENTER">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="setOrgName">Organization Name</label>
+                        <input type="text" name="organization_name" id="setOrgName" required value="<?= htmlspecialchars($GLOBALS['site_settings']['organization_name'] ?? '') ?>" placeholder="e.g. Beersheba Youth Church">
+                    </div>
+                </div>
 
-            <form method="POST" action="settings.php?action=reset_db" onsubmit="return confirm('CRITICAL WARNING: You are about to wipe all database tables and reload system seeds. This action is irreversible. Proceed?')">
-                <button type="submit" class="btn btn-primary" style="background: var(--danger); box-shadow: 0 0.25rem 0.875rem rgba(239, 68, 68, 0.3); width: 100%; justify-content: center;">
-                    Confirm System Re-initialization
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="setContactEmail">Contact Email</label>
+                        <input type="email" name="contact_email" id="setContactEmail" value="<?= htmlspecialchars($GLOBALS['site_settings']['contact_email'] ?? '') ?>" placeholder="e.g. info@byc.org">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="setContactPhone">Contact Phone</label>
+                        <input type="text" name="contact_phone" id="setContactPhone" value="<?= htmlspecialchars($GLOBALS['site_settings']['contact_phone'] ?? '') ?>" placeholder="e.g. 0241112222">
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="setCurrency">Currency Symbol</label>
+                        <input type="text" name="currency" id="setCurrency" value="<?= htmlspecialchars($GLOBALS['site_settings']['currency'] ?? '') ?>" placeholder="e.g. GH₵, $">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="setTimezone">Timezone</label>
+                        <select name="timezone" id="setTimezone">
+                            <?php
+                            $timezones = ['Africa/Accra', 'Africa/Lagos', 'Africa/Nairobi', 'UTC', 'Europe/London', 'America/New_York'];
+                            $current_tz = $GLOBALS['site_settings']['timezone'] ?? 'Africa/Accra';
+                            foreach ($timezones as $tz):
+                                $selected = $tz === $current_tz ? 'selected' : '';
+                                echo "<option value=\"" . htmlspecialchars($tz) . "\" $selected>" . htmlspecialchars($tz) . "</option>";
+                            endforeach;
+                            ?>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-success" style="margin-top: 1.5rem; width: 100%; justify-content: center;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right: 0.25rem;"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                    Save Site Settings
                 </button>
             </form>
         </div>

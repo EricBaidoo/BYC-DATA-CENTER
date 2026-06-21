@@ -283,12 +283,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
 
+    <?php
+    $settings = $GLOBALS['site_settings'] ?? [];
+    $sys_name = $settings['system_name'] ?? 'BYC DATA CENTER';
+    $sys_abbr = !empty($sys_name) ? substr($sys_name, 0, 1) : 'B';
+    $org_name = $settings['organization_name'] ?? 'System Administration Portal';
+    ?>
     <div class="login-card">
         <div class="login-logo">
-            <div class="login-icon">B</div>
+            <div class="login-icon"><?= htmlspecialchars($sys_abbr) ?></div>
             <div>
-                <h1 class="login-title">BYC DATA CENTER</h1>
-                <p class="login-subtitle">System Administration Portal</p>
+                <h1 class="login-title"><?= htmlspecialchars($sys_name) ?></h1>
+                <p class="login-subtitle"><?= htmlspecialchars($org_name) ?></p>
             </div>
         </div>
 
