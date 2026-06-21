@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             $pdo->exec("DROP TABLE IF EXISTS services;");
             $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
 
-            $schema_file = __DIR__ . '/schema.sql';
+            $schema_file = __DIR__ . '/database/schema.sql';
             if (file_exists($schema_file)) {
                 $sql = file_get_contents($schema_file);
                 $pdo->exec($sql);
