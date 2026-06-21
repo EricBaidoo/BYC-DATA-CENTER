@@ -149,12 +149,18 @@ try {
             ('contact_phone', '0241112222'),
             ('currency', 'GH₵'),
             ('timezone', 'Africa/Accra'),
-            ('logo_path', '');");
+            ('logo_path', ''),
+            ('active_session_id', '');");
     } else {
         // Ensure logo_path key exists for older initialized databases
         $stmt_logo_chk = $pdo->query("SELECT COUNT(*) FROM site_settings WHERE setting_key = 'logo_path'");
         if ($stmt_logo_chk->fetchColumn() == 0) {
             $pdo->exec("INSERT INTO site_settings (setting_key, setting_value) VALUES ('logo_path', '')");
+        }
+        // Ensure active_session_id key exists
+        $stmt_session_chk = $pdo->query("SELECT COUNT(*) FROM site_settings WHERE setting_key = 'active_session_id'");
+        if ($stmt_session_chk->fetchColumn() == 0) {
+            $pdo->exec("INSERT INTO site_settings (setting_key, setting_value) VALUES ('active_session_id', '')");
         }
     }
     

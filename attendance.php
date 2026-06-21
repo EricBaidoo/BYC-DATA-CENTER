@@ -6,41 +6,56 @@ require_once __DIR__ . '/includes/layout.php';
 $error = '';
 $success = '';
 
-// 1. Handle Logging Attendance Session
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'log') {
-    $date = trim($_POST['date'] ?? '');
-    $service_id = intval($_POST['service_id'] ?? 0);
-    $present_member_ids = $_POST['present_members'] ?? []; // Array of member IDs marked present
+// Fetch active session state if running
+$active_session_id = $GLOBALS['site_settings']['active_session_id'] ?? '';
+$active_session = null;
+$active_present_members = [];
 
-    if (empty($date) || $service_id <= 0) {
-        $error = 'Service Date and Service Type selection are required.';
+if (!empty($active_session_id)) {
+    $stmt_active = $pdo->prepare("
+        SELECT a.id, a.date, s.name as service_name
+        FROM attendance a
+        JOIN services s ON a.service_id = s.id
+        WHERE a.id = ?
+    ");
+    $stmt_active->execute([$active_session_id]);
+    $active_session = $stmt_active->fetch(PDO::FETCH_ASSOC);
+
+    if ($active_session) {
+        $stmt_pres = $pdo->prepare("SELECT member_id FROM member_attendance WHERE attendance_id = ? AND status = 'Present'");
+        $stmt_pres->execute([$active_session_id]);
+        $active_present_members = $stmt_pres->fetchAll(PDO::FETCH_COLUMN);
+    }
+}
+
+// 1. Handle Updating Active Session Attendance
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save_active') {
+    if (empty($active_session_id) || !$active_session) {
+        $error = 'No active service session is running.';
     } else {
+        $present_member_ids = $_POST['present_members'] ?? []; // Array of member IDs marked present
         try {
-            // Start transaction
             $pdo->beginTransaction();
 
-            // 1. Insert session record
-            $stmt = $pdo->prepare("INSERT INTO attendance (service_id, date) VALUES (?, ?)");
-            $stmt->execute([$service_id, $date]);
-            $attendance_id = $pdo->lastInsertId();
-
-            // 2. Fetch all current members to record attendance status for each one
+            // Fetch all current members
             $members = $pdo->query("SELECT id FROM members")->fetchAll(PDO::FETCH_COLUMN);
 
+            // Re-populate all statuses (clear and insert)
+            $stmt_del = $pdo->prepare("DELETE FROM member_attendance WHERE attendance_id = ?");
+            $stmt_del->execute([$active_session_id]);
+
             $stmt_ma = $pdo->prepare("INSERT INTO member_attendance (member_id, attendance_id, status) VALUES (?, ?, ?)");
-            
             foreach ($members as $member_id) {
-                // If member_id exists in the checked present array, they are Present; otherwise Absent
                 $status = in_array($member_id, $present_member_ids) ? 'Present' : 'Absent';
-                $stmt_ma->execute([$member_id, $attendance_id, $status]);
+                $stmt_ma->execute([$member_id, $active_session_id, $status]);
             }
 
             $pdo->commit();
-            header("Location: attendance?msg=Attendance session logged successfully");
+            header("Location: attendance?msg=Active session attendance updated successfully");
             exit;
         } catch (Exception $e) {
             $pdo->rollBack();
-            $error = 'Error logging session attendance: ' . $e->getMessage();
+            $error = 'Error saving attendance: ' . $e->getMessage();
         }
     }
 }
@@ -167,63 +182,60 @@ render_header('Service Attendance Tracker', 'attendance');
     <!-- Right Column: Form Panel (Session Logger & Service Directory) -->
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
         
-        <!-- Log New Session -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Start Attendance Session</h2>
+        <!-- Active Session Attendance Panel -->
+        <?php if ($active_session): ?>
+            <div class="card-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Take Attendance</h2>
+                </div>
+                
+                <div style="background: rgba(6, 182, 212, 0.08); border: 0.0625rem solid var(--secondary); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem;">
+                    <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.15rem;">Active Service Session</div>
+                    <strong style="font-size: 1.1rem; color: var(--text-primary);"><?= htmlspecialchars($active_session['service_name']) ?></strong>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;"><?= date('l, M d, Y', strtotime($active_session['date'])) ?></div>
+                </div>
+
+                <?php if (empty($all_members)): ?>
+                    <p style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">Register members in the directory to mark attendance.</p>
+                <?php else: ?>
+                    <form method="POST" action="attendance?action=save_active">
+                        <div class="attendance-sheet-header">
+                            <label>Attendance Sheet (Check who is Present)</label>
+                            <label class="checkbox-custom" style="font-size: 0.8rem;">
+                                <input type="checkbox" id="toggleAllMembers">
+                                <span class="checkbox-indicator"></span> Select All
+                            </label>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0.75rem;">
+                            <input type="text" id="attendanceMemberSearch" placeholder="🔍 Type name to filter attendance list..." class="search-input" style="height: auto; padding: 0.5rem 0.75rem; font-size: 0.85rem; border-color: var(--border-color);">
+                        </div>
+
+                        <div class="attendance-list-container" style="margin-bottom: 1.5rem; max-height: 20rem;">
+                            <?php foreach ($all_members as $m): ?>
+                                <div class="attendance-member-row">
+                                    <label class="checkbox-custom">
+                                        <input type="checkbox" class="member-checkbox" name="present_members[]" value="<?= $m['id'] ?>" <?= in_array($m['id'], $active_present_members) ? 'checked' : '' ?>>
+                                        <span class="checkbox-indicator"></span>
+                                        <span style="font-size: 0.9rem; font-weight: 500;"><?= htmlspecialchars($m['name']) ?></span>
+                                    </label>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($m['gender']) ?></span>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Save Attendance Changes</button>
+                    </form>
+                <?php endif; ?>
             </div>
-            
-            <?php if (empty($services)): ?>
-                <p style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">Please define at least one service type in the <a href="settings" style="color: var(--primary); text-decoration: underline;">Settings page</a> before starting a session.</p>
-            <?php elseif (empty($all_members)): ?>
-                <p style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">Register members in the directory before logging attendance.</p>
-            <?php else: ?>
-                <form method="POST" action="attendance?action=log">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="serviceId">Select Service Type</label>
-                            <select name="service_id" id="serviceId" required>
-                                <option value="">-- Choose Service --</option>
-                                <?php foreach ($services as $srv): ?>
-                                    <option value="<?= $srv['id'] ?>"><?= htmlspecialchars($srv['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="serviceDate">Session Date</label>
-                            <input type="date" name="date" id="serviceDate" required value="<?= date('Y-m-d') ?>">
-                        </div>
-                    </div>
-
-                    <div class="attendance-sheet-header">
-                        <label>Attendance Sheet (Check who is Present)</label>
-                        <label class="checkbox-custom" style="font-size: 0.8rem;">
-                            <input type="checkbox" id="toggleAllMembers">
-                            <span class="checkbox-indicator"></span> Select All
-                        </label>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 0.75rem;">
-                        <input type="text" id="attendanceMemberSearch" placeholder="🔍 Type name to filter attendance list..." class="search-input" style="height: auto; padding: 0.5rem 0.75rem; font-size: 0.85rem; border-color: var(--border-color);">
-                    </div>
-
-                    <div class="attendance-list-container" style="margin-bottom: 1.5rem; max-height: 15.625rem;">
-                        <?php foreach ($all_members as $m): ?>
-                            <div class="attendance-member-row">
-                                <label class="checkbox-custom">
-                                    <input type="checkbox" class="member-checkbox" name="present_members[]" value="<?= $m['id'] ?>">
-                                    <span class="checkbox-indicator"></span>
-                                    <span style="font-size: 0.9rem; font-weight: 500;"><?= htmlspecialchars($m['name']) ?></span>
-                                </label>
-                                <span style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($m['gender']) ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Save Session & Take Attendance</button>
-                </form>
-            <?php endif; ?>
-        </div>
+        <?php else: ?>
+            <div style="background: rgba(255, 255, 255, 0.02); border: 0.0625rem solid var(--border-color); padding: 2rem; border-radius: var(--radius-sm); text-align: center;">
+                <svg width="40" height="40" fill="none" stroke="var(--text-muted)" stroke-width="2" viewBox="0 0 24 24" style="margin-bottom: 1rem; opacity: 0.6;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">No Active Service Session</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; max-width: 16rem; margin-left: auto; margin-right: auto;">You must start an active service session in the Settings panel before taking member attendance.</p>
+                <a href="settings?tab=sessions" class="btn btn-primary" style="display: inline-flex; justify-content: center; width: auto; padding: 0.5rem 1.25rem;">Go to Settings</a>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

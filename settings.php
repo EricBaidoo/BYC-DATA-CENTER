@@ -193,6 +193,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             }
         }
     }
+    
+    // Start Service Session
+    elseif ($action === 'start_session') {
+        $service_id = intval($_POST['service_id'] ?? 0);
+        $date = trim($_POST['date'] ?? '');
+        
+        if ($service_id <= 0 || empty($date)) {
+            $error = 'Service type and date selection are required to start a session.';
+        } else {
+            try {
+                $pdo->beginTransaction();
+                
+                // 1. Insert session record into attendance
+                $stmt = $pdo->prepare("INSERT INTO attendance (service_id, date) VALUES (?, ?)");
+                $stmt->execute([$service_id, $date]);
+                $attendance_id = $pdo->lastInsertId();
+                
+                // 2. Update active_session_id in settings
+                $stmt_set = $pdo->prepare("UPDATE site_settings SET setting_value = ? WHERE setting_key = 'active_session_id'");
+                $stmt_set->execute([$attendance_id]);
+                
+                // 3. Pre-populate all current members in member_attendance as 'Absent'
+                $members = $pdo->query("SELECT id FROM members")->fetchAll(PDO::FETCH_COLUMN);
+                $stmt_ma = $pdo->prepare("INSERT IGNORE INTO member_attendance (member_id, attendance_id, status) VALUES (?, ?, 'Absent')");
+                foreach ($members as $member_id) {
+                    $stmt_ma->execute([$member_id, $attendance_id]);
+                }
+                
+                $pdo->commit();
+                
+                header("Location: settings?tab=sessions&msg=Service session started successfully. Go to the Attendance page to take attendance.");
+                exit;
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = 'Error starting service session: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Close Service Session
+    elseif ($action === 'close_session') {
+        try {
+            $stmt_set = $pdo->prepare("UPDATE site_settings SET setting_value = '' WHERE setting_key = 'active_session_id'");
+            $stmt_set->execute();
+            header("Location: settings?tab=sessions&msg=Service session closed successfully");
+            exit;
+        } catch (PDOException $e) {
+            $error = 'Error closing service session: ' . $e->getMessage();
+        }
+    }
 }
 
 // 2. Handle GET Deletions
@@ -261,8 +311,22 @@ $services = $pdo->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PD
 $departments = $pdo->query("SELECT * FROM departments ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $users = $pdo->query("SELECT id, username, name, created_at FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Determine active tab (defaults to services)
-$active_tab = $_GET['tab'] ?? 'services';
+// Fetch active session state if running
+$active_session_id = $GLOBALS['site_settings']['active_session_id'] ?? '';
+$active_session = null;
+if (!empty($active_session_id)) {
+    $stmt_active = $pdo->prepare("
+        SELECT a.id, a.date, s.name as service_name
+        FROM attendance a
+        JOIN services s ON a.service_id = s.id
+        WHERE a.id = ?
+    ");
+    $stmt_active->execute([$active_session_id]);
+    $active_session = $stmt_active->fetch(PDO::FETCH_ASSOC);
+}
+
+// Determine active tab (defaults to sessions)
+$active_tab = $_GET['tab'] ?? 'sessions';
 
 render_header('Settings & Administration', 'settings');
 ?>
@@ -281,10 +345,73 @@ render_header('Settings & Administration', 'settings');
 
 <!-- Settings Tab Navigation -->
 <div class="settings-tabs">
+    <button class="settings-tab-btn <?= $active_tab === 'sessions' ? 'active' : '' ?>" onclick="switchTab('sessions')">Service Sessions</button>
     <button class="settings-tab-btn <?= $active_tab === 'services' ? 'active' : '' ?>" onclick="switchTab('services')">Service Types</button>
     <button class="settings-tab-btn <?= $active_tab === 'departments' ? 'active' : '' ?>" onclick="switchTab('departments')">Departments</button>
     <button class="settings-tab-btn <?= $active_tab === 'users' ? 'active' : '' ?>" onclick="switchTab('users')">User Accounts</button>
     <button class="settings-tab-btn <?= $active_tab === 'system' ? 'active' : '' ?>" onclick="switchTab('system')">Site Settings</button>
+</div>
+
+<!-- Tab: Service Sessions Control -->
+<div id="tabContent-sessions" class="settings-tab-content <?= $active_tab === 'sessions' ? 'active' : '' ?>">
+    <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 37.5rem; margin: 0 auto;">
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Active Service Session</h2>
+            </div>
+            
+            <?php if ($active_session): ?>
+                <div style="background: rgba(6, 182, 212, 0.08); border: 0.0625rem solid var(--secondary); padding: 1.5rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; text-align: center;">
+                    <span class="badge badge-success" style="margin-bottom: 0.75rem; font-size: 0.8rem; padding: 0.35rem 0.75rem;">LIVE SESSION RUNNING</span>
+                    <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.25rem; color: var(--text-primary);">
+                        <?= htmlspecialchars($active_session['service_name']) ?>
+                    </h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+                        Started on <?= date('l, M d, Y', strtotime($active_session['date'])) ?>
+                    </p>
+                    
+                    <a href="attendance" class="btn btn-primary" style="display: inline-flex; justify-content: center; width: auto; padding: 0.6rem 1.5rem; margin-right: 0.75rem;">
+                        Take Attendance
+                    </a>
+                    
+                    <form method="POST" action="settings?action=close_session" style="display: inline-block; margin: 0;">
+                        <button type="submit" class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger); padding: 0.6rem 1.5rem;" onclick="return confirm('Are you sure you want to close this service session? After closing, attendance for this session can no longer be updated live.')">
+                            Close Session
+                        </button>
+                    </form>
+                </div>
+            <?php else: ?>
+                <div style="background: rgba(255, 255, 255, 0.02); border: 0.0625rem solid var(--border-color); padding: 1.5rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; text-align: center;">
+                    <p style="color: var(--text-muted); margin-bottom: 0;">No active service session is running. Start one below to begin taking attendance.</p>
+                </div>
+                
+                <?php if (empty($services)): ?>
+                    <p style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">Please define at least one service type in the <strong>Service Types</strong> tab before starting a session.</p>
+                <?php else: ?>
+                    <form method="POST" action="settings?action=start_session">
+                        <div class="form-grid" style="grid-template-columns: 1fr; gap: 1.25rem;">
+                            <div class="form-group">
+                                <label for="sessServiceId">Select Service Type</label>
+                                <select name="service_id" id="sessServiceId" required>
+                                    <option value="">-- Choose Service --</option>
+                                    <?php foreach ($services as $srv): ?>
+                                        <option value="<?= $srv['id'] ?>"><?= htmlspecialchars($srv['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="sessDate">Session Date</label>
+                                <input type="date" name="date" id="sessDate" required value="<?= date('Y-m-d') ?>">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success" style="margin-top: 1.5rem; width: 100%; justify-content: center;">
+                            Start Service Session
+                        </button>
+                    </form>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <!-- Tab 1: Service Types Management -->
