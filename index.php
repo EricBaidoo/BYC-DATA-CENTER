@@ -74,6 +74,18 @@ $stmt = $pdo->query("
 ");
 $recent_members = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch Upcoming Birthdays (Next 30 Days)
+$stmt = $pdo->query("
+    SELECT name, birthday,
+           DATE_ADD(birthday, INTERVAL YEAR(CURDATE()) - YEAR(birthday) + (CASE WHEN DATE_FORMAT(birthday, '%m%d') < DATE_FORMAT(CURDATE(), '%m%d') THEN 1 ELSE 0 END) YEAR) AS next_birthday
+    FROM members
+    WHERE birthday IS NOT NULL
+    HAVING next_birthday BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ORDER BY next_birthday ASC
+    LIMIT 5
+");
+$upcoming_birthdays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 render_header('Overview Dashboard', 'dashboard');
 ?>
 
@@ -160,32 +172,67 @@ render_header('Overview Dashboard', 'dashboard');
         </div>
     </div>
 
-    <!-- Recently Added Members Panel -->
-    <div class="card-panel">
-        <div class="panel-header">
-            <h2 class="panel-title">Recently Registered</h2>
-            <a href="members" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">View All</a>
-        </div>
-        <div class="activity-list">
-            <?php if (empty($recent_members)): ?>
-                <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No members registered yet.</p>
-            <?php else: ?>
-                <?php foreach ($recent_members as $member): 
-                    $initials = strtoupper(substr($member['name'], 0, 1));
-                ?>
-                    <div class="activity-item">
-                        <div class="activity-avatar"><?= htmlspecialchars($initials) ?></div>
-                        <div class="activity-info">
-                            <div class="activity-name"><?= htmlspecialchars($member['name']) ?></div>
-                            <div class="activity-meta">Dept: <?= htmlspecialchars($member['dept_name'] ?? 'None') ?></div>
+    <!-- Right Column: Recent Members & Upcoming Birthdays -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Recently Registered Members Panel -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Recently Registered</h2>
+                <a href="members" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">View All</a>
+            </div>
+            <div class="activity-list">
+                <?php if (empty($recent_members)): ?>
+                    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No members registered yet.</p>
+                <?php else: ?>
+                    <?php foreach ($recent_members as $member): 
+                        $initials = strtoupper(substr($member['name'], 0, 1));
+                    ?>
+                        <div class="activity-item">
+                            <div class="activity-avatar"><?= htmlspecialchars($initials) ?></div>
+                            <div class="activity-info">
+                                <div class="activity-name"><?= htmlspecialchars($member['name']) ?></div>
+                                <div class="activity-meta">Dept: <?= htmlspecialchars($member['dept_name'] ?? 'None') ?></div>
+                            </div>
+                            <div class="activity-meta" style="font-size: 0.75rem;">
+                                <?= date('M d', strtotime($member['join_date'])) ?>
+                            </div>
                         </div>
-                        <div class="activity-meta" style="font-size: 0.75rem;">
-                            <?= date('M d', strtotime($member['join_date'])) ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
+
+        <!-- Upcoming Birthdays Panel -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Upcoming Birthdays (Next 30 Days)</h2>
+            </div>
+            <div class="activity-list">
+                <?php if (empty($upcoming_birthdays)): ?>
+                    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No birthdays in the next 30 days.</p>
+                <?php else: ?>
+                    <?php foreach ($upcoming_birthdays as $bday): 
+                        $initials = strtoupper(substr($bday['name'], 0, 1));
+                        $days_left = intval(round((strtotime($bday['next_birthday']) - strtotime(date('Y-m-d'))) / (60 * 60 * 24)));
+                        $days_text = $days_left === 0 ? 'Today!' : ($days_left === 1 ? 'Tomorrow' : "In $days_left days");
+                        $days_color = $days_left === 0 ? 'var(--danger)' : ($days_left <= 7 ? 'var(--warning)' : 'var(--text-muted)');
+                    ?>
+                        <div class="activity-item">
+                            <div class="activity-avatar" style="background: linear-gradient(135deg, var(--warning), var(--danger));"><?= htmlspecialchars($initials) ?></div>
+                            <div class="activity-info">
+                                <div class="activity-name"><?= htmlspecialchars($bday['name']) ?></div>
+                                <div class="activity-meta">Birthday: <?= date('M d', strtotime($bday['birthday'])) ?></div>
+                            </div>
+                            <div class="activity-meta" style="font-size: 0.75rem; font-weight: 600; color: <?= $days_color ?>;">
+                                <?= htmlspecialchars($days_text) ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
     </div>
 </div>
 
