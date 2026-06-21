@@ -46,6 +46,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
         }
     }
     
+    // Add User Account
+    elseif ($action === 'add_user') {
+        $username = trim($_POST['username'] ?? '');
+        $name = trim($_POST['name'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        
+        if (empty($username) || empty($password)) {
+            $error = 'Username and password fields are required.';
+        } else {
+            try {
+                $stmt_chk = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
+                $stmt_chk->execute([$username]);
+                if ($stmt_chk->fetchColumn() > 0) {
+                    $error = 'Username already exists.';
+                } else {
+                    $pass_hash = password_hash($password, PASSWORD_DEFAULT);
+                    $stmt = $pdo->prepare("INSERT INTO users (username, password, name) VALUES (?, ?, ?)");
+                    $stmt->execute([$username, $pass_hash, $name]);
+                    header("Location: settings?tab=users&msg=User account created successfully");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error = 'Error creating user: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Edit User Account
+    elseif ($action === 'edit_user') {
+        $id = intval($_POST['id'] ?? 0);
+        $username = trim($_POST['username'] ?? '');
+        $name = trim($_POST['name'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        
+        if ($id <= 0 || empty($username)) {
+            $error = 'Invalid user ID or username.';
+        } else {
+            try {
+                $stmt_chk = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ? AND id != ?");
+                $stmt_chk->execute([$username, $id]);
+                if ($stmt_chk->fetchColumn() > 0) {
+                    $error = 'Username already exists.';
+                } else {
+                    if (!empty($password)) {
+                        $pass_hash = password_hash($password, PASSWORD_DEFAULT);
+                        $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, name = ? WHERE id = ?");
+                        $stmt->execute([$username, $pass_hash, $name, $id]);
+                    } else {
+                        $stmt = $pdo->prepare("UPDATE users SET username = ?, name = ? WHERE id = ?");
+                        $stmt->execute([$username, $name, $id]);
+                    }
+                    
+                    if ($id === $_SESSION['user_id']) {
+                        $_SESSION['username'] = $username;
+                        $_SESSION['user_name'] = $name ?: 'Administrator';
+                    }
+                    
+                    header("Location: settings?tab=users&msg=User profile updated successfully");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error = 'Error updating user: ' . $e->getMessage();
+            }
+        }
+    }
+    
     // Reset Database
     elseif ($action === 'reset_db') {
         try {
@@ -135,6 +201,26 @@ if (isset($_GET['action'])) {
             $error = 'Error deleting department: ' . $e->getMessage();
         }
     }
+    
+    elseif ($action === 'delete_user' && $id > 0) {
+        if ($id === $_SESSION['user_id']) {
+            $error = 'You cannot delete your own active session.';
+        } else {
+            try {
+                $user_count = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+                if ($user_count <= 1) {
+                    $error = 'At least one administrator account must be retained.';
+                } else {
+                    $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                    $stmt->execute([$id]);
+                    header("Location: settings?tab=users&msg=User account deleted successfully");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error = 'Error deleting user: ' . $e->getMessage();
+            }
+        }
+    }
 }
 
 if (isset($_GET['msg'])) {
@@ -144,6 +230,7 @@ if (isset($_GET['msg'])) {
 // Fetch all services & departments for administration list
 $services = $pdo->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $departments = $pdo->query("SELECT * FROM departments ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$users = $pdo->query("SELECT id, username, name, created_at FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Determine active tab (defaults to services)
 $active_tab = $_GET['tab'] ?? 'services';
@@ -167,6 +254,7 @@ render_header('Settings & Administration', 'settings');
 <div class="settings-tabs">
     <button class="settings-tab-btn <?= $active_tab === 'services' ? 'active' : '' ?>" onclick="switchTab('services')">Service Types</button>
     <button class="settings-tab-btn <?= $active_tab === 'departments' ? 'active' : '' ?>" onclick="switchTab('departments')">Departments</button>
+    <button class="settings-tab-btn <?= $active_tab === 'users' ? 'active' : '' ?>" onclick="switchTab('users')">User Accounts</button>
     <button class="settings-tab-btn <?= $active_tab === 'system' ? 'active' : '' ?>" onclick="switchTab('system')">System Control</button>
 </div>
 
@@ -288,7 +376,81 @@ render_header('Settings & Administration', 'settings');
     </div>
 </div>
 
-<!-- Tab 3: System Reset Control -->
+<!-- Tab 3: User Accounts Management -->
+<div id="tabContent-users" class="settings-tab-content <?= $active_tab === 'users' ? 'active' : '' ?>">
+    <div class="dashboard-grid">
+        <!-- Add/Edit User Form -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title" id="userFormTitle">Register New User</h2>
+            </div>
+            <form id="userForm" method="POST" action="settings?action=add_user">
+                <input type="hidden" name="id" id="formUserId">
+                
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label for="formUserName">Display Name</label>
+                    <input type="text" name="name" id="formUserName" required placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label for="formUserUsername">Username</label>
+                    <input type="text" name="username" id="formUserUsername" required placeholder="e.g. johndoe">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="formUserPassword" id="formUserPasswordLabel">Password</label>
+                    <input type="password" name="password" id="formUserPassword" required placeholder="Enter password...">
+                </div>
+                
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="submit" id="userSubmitBtn" class="btn btn-success" style="flex-grow: 1; justify-content: center;">Save User</button>
+                    <button type="button" id="userCancelBtn" class="btn btn-secondary" style="display: none; justify-content: center;" onclick="resetUserForm()">Cancel</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- List of Users -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Active User Accounts</h2>
+            </div>
+            <div class="table-container">
+                <?php if (empty($users)): ?>
+                    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No user accounts found.</p>
+                <?php else: ?>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name & Username</th>
+                                <th>Created Date</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($users as $usr): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= htmlspecialchars($usr['name'] ?: 'No Name') ?></strong>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">@<?= htmlspecialchars($usr['username']) ?></div>
+                                    </td>
+                                    <td><?= date('M d, Y', strtotime($usr['created_at'])) ?></td>
+                                    <td style="text-align: right;">
+                                        <button class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;" onclick='openEditUserMode(<?= json_encode($usr) ?>)'>Edit</button>
+                                        <?php if ($usr['id'] !== $_SESSION['user_id']): ?>
+                                            <a href="settings?action=delete_user&id=<?= $usr['id'] ?>" class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="return confirm('Are you sure you want to permanently delete this user account?')">Delete</a>
+                                        <?php else: ?>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Active Session</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab 4: System Reset Control -->
 <div id="tabContent-system" class="settings-tab-content <?= $active_tab === 'system' ? 'active' : '' ?>">
     <div style="max-width: 37.5rem; margin: 0 auto;">
         <div class="card-panel" style="border-color: rgba(239, 68, 68, 0.2); background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), transparent);">
@@ -343,6 +505,52 @@ function switchTab(tabName) {
     // Update query string parameter for browser history
     const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?tab=' + tabName;
     window.history.pushState({path:newurl},'',newurl);
+}
+
+function openEditUserMode(user) {
+    const title = document.getElementById('userFormTitle');
+    const form = document.getElementById('userForm');
+    const cancelBtn = document.getElementById('userCancelBtn');
+    const submitBtn = document.getElementById('userSubmitBtn');
+    const passLabel = document.getElementById('formUserPasswordLabel');
+    const passInput = document.getElementById('formUserPassword');
+    
+    title.textContent = 'Edit User Profile';
+    form.action = 'settings?action=edit_user';
+    
+    document.getElementById('formUserId').value = user.id;
+    document.getElementById('formUserName').value = user.name || '';
+    document.getElementById('formUserUsername').value = user.username || '';
+    
+    passLabel.textContent = 'Password (leave blank to keep current)';
+    passInput.required = false;
+    passInput.placeholder = 'Enter new password or leave blank...';
+    passInput.value = '';
+    
+    cancelBtn.style.display = 'block';
+    submitBtn.textContent = 'Update User';
+}
+
+function resetUserForm() {
+    const title = document.getElementById('userFormTitle');
+    const form = document.getElementById('userForm');
+    const cancelBtn = document.getElementById('userCancelBtn');
+    const submitBtn = document.getElementById('userSubmitBtn');
+    const passLabel = document.getElementById('formUserPasswordLabel');
+    const passInput = document.getElementById('formUserPassword');
+    
+    form.reset();
+    title.textContent = 'Register New User';
+    form.action = 'settings?action=add_user';
+    
+    document.getElementById('formUserId').value = '';
+    
+    passLabel.textContent = 'Password';
+    passInput.required = true;
+    passInput.placeholder = 'Enter password...';
+    
+    cancelBtn.style.display = 'none';
+    submitBtn.textContent = 'Save User';
 }
 </script>
 
