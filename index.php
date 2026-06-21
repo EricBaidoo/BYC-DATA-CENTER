@@ -70,7 +70,7 @@ $stmt = $pdo->query("
     FROM members m
     LEFT JOIN departments d ON m.department_id = d.id
     ORDER BY m.created_at DESC
-    LIMIT 5
+    LIMIT 3
 ");
 $recent_members = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -82,7 +82,7 @@ $stmt = $pdo->query("
     WHERE birthday IS NOT NULL
     HAVING next_birthday BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
     ORDER BY next_birthday ASC
-    LIMIT 5
+    LIMIT 3
 ");
 $upcoming_birthdays = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
