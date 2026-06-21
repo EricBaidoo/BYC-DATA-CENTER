@@ -138,15 +138,17 @@ render_header('Workforce Departments', 'workforce');
         <form id="deptForm" method="POST" action="workforce?action=edit">
             <input type="hidden" name="id" id="deptId">
             
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group">
-                    <label for="formDeptName">Department Name</label>
-                    <input type="text" name="name" id="formDeptName" required placeholder="e.g. Media & Tech Team">
-                </div>
-                
-                <div class="form-group">
-                    <label for="formDeptDesc">Description</label>
-                    <textarea name="description" id="formDeptDesc" rows="3" placeholder="Describe the roles and functions of this department..."></textarea>
+            <div class="modal-body">
+                <div class="form-grid" style="grid-template-columns: 1fr;">
+                    <div class="form-group">
+                        <label for="formDeptName">Department Name</label>
+                        <input type="text" name="name" id="formDeptName" required placeholder="e.g. Media & Tech Team">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="formDeptDesc">Description</label>
+                        <textarea name="description" id="formDeptDesc" rows="3" placeholder="Describe the roles and functions of this department..."></textarea>
+                    </div>
                 </div>
             </div>
             

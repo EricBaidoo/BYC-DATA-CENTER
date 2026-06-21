@@ -281,52 +281,54 @@ render_header('Membership Directory', 'members');
         <form id="memberForm" method="POST" action="members?action=add">
             <input type="hidden" name="id" id="memberId">
             
-            <div class="form-grid">
-                <div class="form-group full-width">
-                    <label for="formName">Full Name</label>
-                    <input type="text" name="name" id="formName" required placeholder="e.g. John Doe">
-                </div>
-                
-                <div class="form-group">
-                    <label for="formGender">Gender</label>
-                    <select name="gender" id="formGender">
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="formPhone">Phone Number</label>
-                    <input type="text" name="phone" id="formPhone" placeholder="e.g. 0244123456">
-                </div>
-                
-                <div class="form-group">
-                    <label for="formEmail">Email Address</label>
-                    <input type="email" name="email" id="formEmail" placeholder="e.g. john@byc.org">
-                </div>
-                
-                <div class="form-group">
-                    <label for="formBirthday">Birthday</label>
-                    <input type="date" name="birthday" id="formBirthday">
-                </div>
-                
-                <div class="form-group">
-                    <label for="formJoinDate">Join Date</label>
-                    <input type="date" name="join_date" id="formJoinDate" value="<?= date('Y-m-d') ?>">
-                </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="formName">Full Name</label>
+                        <input type="text" name="name" id="formName" required placeholder="e.g. John Doe">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="formGender">Gender</label>
+                        <select name="gender" id="formGender">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="formPhone">Phone Number</label>
+                        <input type="text" name="phone" id="formPhone" placeholder="e.g. 0244123456">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="formEmail">Email Address</label>
+                        <input type="email" name="email" id="formEmail" placeholder="e.g. john@byc.org">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="formBirthday">Birthday</label>
+                        <input type="date" name="birthday" id="formBirthday">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="formJoinDate">Join Date</label>
+                        <input type="date" name="join_date" id="formJoinDate" value="<?= date('Y-m-d') ?>">
+                    </div>
 
-                <div class="form-group">
-                    <label for="formDept">Department Assignment</label>
-                    <select name="department_id" id="formDept">
-                        <?php foreach ($departments as $dept): ?>
-                            <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                    <div class="form-group">
+                        <label for="formDept">Department Assignment</label>
+                        <select name="department_id" id="formDept">
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-                <div class="form-group full-width">
-                    <label for="formAddress">Residential Address</label>
-                    <textarea name="address" id="formAddress" rows="2" placeholder="e.g. House No. 4, Airport West, Accra"></textarea>
+                    <div class="form-group full-width">
+                        <label for="formAddress">Residential Address</label>
+                        <textarea name="address" id="formAddress" rows="2" placeholder="e.g. House No. 4, Airport West, Accra"></textarea>
+                    </div>
                 </div>
             </div>
             

@@ -686,12 +686,11 @@ input:focus, select:focus, textarea:focus {
     min-height: 0;
 }
 
-.modal-container .form-grid {
+.modal-body {
     overflow-y: auto;
     flex: 1;
     min-height: 0;
     padding-right: 0.5rem;
-    margin-bottom: 0;
 }
 
 .modal-footer {
@@ -706,18 +705,28 @@ input:focus, select:focus, textarea:focus {
 
 @media (max-width: 48rem) {
     .modal-overlay {
-        align-items: center;
-        padding: 1rem;
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 0;
     }
     .modal-container {
-        max-height: 95vh;
-        padding: 1.5rem 1.25rem;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        border-radius: 0;
+        border: none;
+        padding: 1.5rem 1.25rem !important;
+        margin: 0 !important;
     }
     .modal-footer {
         flex-direction: column-reverse;
         gap: 0.75rem;
         margin-top: 1rem;
         padding-top: 1rem;
+    }
+    .modal-footer button, .modal-footer .btn {
+        width: 100% !important;
     }
 }
 
