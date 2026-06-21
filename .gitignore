@@ -1,0 +1,6 @@
+# Local configuration credentials
+config.php
+.env
+
+# PHP runtime logs
+php_errors.log
