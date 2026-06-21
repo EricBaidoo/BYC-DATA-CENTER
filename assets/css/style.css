@@ -653,7 +653,7 @@ input:focus, select:focus, textarea:focus {
 
 .modal-overlay.active {
     opacity: 1;
-    pointer-events: all;
+    pointer-events: auto;
 }
 
 .modal-container {
@@ -667,11 +667,58 @@ input:focus, select:focus, textarea:focus {
     transform: scale(0.95) translateY(1.25rem);
     opacity: 0;
     transition: var(--transition);
+    
+    /* Support internal scrolling */
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-overlay.active .modal-container {
     transform: scale(1) translateY(0);
     opacity: 1;
+}
+
+.modal-container form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.modal-container .form-grid {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 0.5rem;
+    margin-bottom: 0;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    border-top: 0.0625rem solid var(--border-color);
+    padding-top: 1.25rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 48rem) {
+    .modal-overlay {
+        align-items: center;
+        padding: 1rem;
+    }
+    .modal-container {
+        max-height: 95vh;
+        padding: 1.5rem 1.25rem;
+    }
+    .modal-footer {
+        flex-direction: column-reverse;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+    }
 }
 
 .modal-header {

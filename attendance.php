@@ -257,7 +257,7 @@ render_header('Service Attendance Tracker', 'attendance');
                 <?php endforeach; ?>
             </div>
             
-            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem; border-top: 0.0625rem solid var(--border-color); padding-top: 1rem;">
+            <div class="modal-footer">
                 <a href="attendance" class="btn btn-secondary">Close</a>
             </div>
         </div>

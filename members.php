@@ -330,7 +330,7 @@ render_header('Membership Directory', 'members');
                 </div>
             </div>
             
-            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; border-top: 0.0625rem solid var(--border-color); padding-top: 1.25rem;">
+            <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                 <button type="submit" class="btn btn-success" id="formSubmitBtn">Save Member</button>
             </div>
