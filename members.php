@@ -326,140 +326,158 @@ render_header('Membership Directory', 'members');
         </table>
     <?php endif; ?>
 </div>
+<!-- Add/Edit Member Drawer Overlay -->
+<div id="memberDrawer" class="fixed inset-0 z-[100] invisible" role="dialog" aria-modal="true">
+    <!-- Backdrop overlay -->
+    <div id="drawerBackdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 ease-in-out" onclick="closeDrawer()"></div>
+    
+    <!-- Drawer Container -->
+    <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+        <div id="drawerPanel" class="w-screen max-w-md sm:max-w-lg bg-bg-surface-solid border-l border-border-custom shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col h-full">
+            
+            <!-- Header -->
+            <div class="px-6 py-5 border-b border-border-custom flex items-center justify-between bg-black/10 flex-shrink-0">
+                <div>
+                    <h2 id="drawerTitle" class="text-lg font-heading font-bold text-white">Register New Member</h2>
+                    <p id="drawerSubtitle" class="text-2xs text-text-muted mt-0.5">Fill out all the details to register a new member profile.</p>
+                </div>
+                <button type="button" class="text-text-muted hover:text-white text-2xl font-light cursor-pointer leading-none p-1 bg-none border-none" onclick="closeDrawer()">&times;</button>
+            </div>
+            
+            <!-- Scrollable Content Form -->
+            <form id="memberForm" method="POST" action="members?action=add" class="flex flex-col flex-grow overflow-hidden m-0">
+                <?php render_csrf_input(); ?>
+                <input type="hidden" name="id" id="memberId">
+                
+                <div class="flex-grow overflow-y-auto px-6 py-6 space-y-5">
+                    <!-- Form Fields -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formFirstName" class="text-xs font-semibold text-text-secondary">First Name *</label>
+                            <input type="text" name="first_name" id="formFirstName" required placeholder="e.g. John" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formLastName" class="text-xs font-semibold text-text-secondary">Last Name</label>
+                            <input type="text" name="last_name" id="formLastName" placeholder="e.g. Doe" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        </div>
+                    </div>
 
-<!-- Add/Edit Member Modal Overlay -->
-<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1000] opacity-0 pointer-events-none transition-all duration-300" id="memberModal">
-    <div class="bg-bg-surface-solid border border-border-custom rounded-none sm:rounded-2xl w-full max-w-full sm:max-w-[640px] h-full sm:h-auto max-h-full sm:max-h-[90vh] p-6 shadow-2xl flex flex-col scale-95 opacity-0 transition-all duration-300" id="memberModalContainer">
-        <div class="flex justify-between items-center mb-5 flex-shrink-0">
-            <h2 class="font-heading font-bold text-lg text-white" id="modalTitle">Register New Member</h2>
-            <button class="text-2xl text-text-muted hover:text-white bg-none border-none p-0 cursor-pointer leading-none" onclick="closeModal()">&times;</button>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formGender" class="text-xs font-semibold text-text-secondary">Gender</label>
+                            <select name="gender" id="formGender" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formPhone" class="text-xs font-semibold text-text-secondary">Phone Number</label>
+                            <input type="text" name="phone" id="formPhone" placeholder="e.g. 0244123456" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formEmail" class="text-xs font-semibold text-text-secondary">Email Address</label>
+                            <input type="email" name="email" id="formEmail" placeholder="e.g. john@byc.org" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formBirthday" class="text-xs font-semibold text-text-secondary">Birthday</label>
+                            <input type="date" name="birthday" id="formBirthday" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formJoinDate" class="text-xs font-semibold text-text-secondary">Join Date</label>
+                            <input type="date" name="join_date" id="formJoinDate" value="<?= date('Y-m-d') ?>" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formDept" class="text-xs font-semibold text-text-secondary">Department Assignment</label>
+                            <select name="department_id" id="formDept" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formMemberStatus" class="text-xs font-semibold text-text-secondary">Ministry Status</label>
+                            <select name="member_status" id="formMemberStatus" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                                <option value="Member">Member</option>
+                                <option value="Visitor">Visitor</option>
+                                <option value="Adherent">Adherent</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label for="formHousehold" class="text-xs font-semibold text-text-secondary">Household Cohort</label>
+                            <select name="household_id" id="formHousehold" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                                <option value="">-- No Household --</option>
+                                <?php foreach ($households as $house): ?>
+                                    <option value="<?= $house['id'] ?>"><?= htmlspecialchars($house['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label for="formHomeCell" class="text-xs font-semibold text-text-secondary">Home Cell Fellowship</label>
+                        <select name="home_cell_id" id="formHomeCell" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                            <option value="">-- No Home Cell --</option>
+                            <?php foreach ($home_cells as $cell): ?>
+                                <option value="<?= $cell['id'] ?>"><?= htmlspecialchars($cell['name']) ?> (<?= htmlspecialchars($cell['location']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="bg-black/10 border border-border-custom rounded-lg p-4 space-y-3.5">
+                        <span class="text-2xs font-bold text-text-secondary uppercase tracking-wider block">Discipleship Milestones</span>
+                        <div class="flex flex-col gap-2.5">
+                            <label class="flex items-center gap-2.5 cursor-pointer text-sm text-white font-medium select-none">
+                                <input type="checkbox" name="water_baptized" id="formWaterBaptized" value="1" class="w-4 h-4 rounded border-white/10 bg-black/30 text-primary checked:bg-primary checked:border-primary focus:ring-offset-0 focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer">
+                                <span>Water Baptized</span>
+                            </label>
+                            <label class="flex items-center gap-2.5 cursor-pointer text-sm text-white font-medium select-none">
+                                <input type="checkbox" name="holy_ghost_baptized" id="formHolyGhostBaptized" value="1" class="w-4 h-4 rounded border-white/10 bg-black/30 text-primary checked:bg-primary checked:border-primary focus:ring-offset-0 focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer">
+                                <span>Holy Ghost Baptized</span>
+                            </label>
+                            <label class="flex items-center gap-2.5 cursor-pointer text-sm text-white font-medium select-none">
+                                <input type="checkbox" name="discipleship_completed" id="formDiscipleshipCompleted" value="1" class="w-4 h-4 rounded border-white/10 bg-black/30 text-primary checked:bg-primary checked:border-primary focus:ring-offset-0 focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer">
+                                <span>Discipleship Graduate</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label for="formAddress" class="text-xs font-semibold text-text-secondary">Residential Address</label>
+                        <textarea name="address" id="formAddress" rows="2" placeholder="e.g. House No. 4, Airport West, Accra" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div class="px-6 py-4 border-t border-border-custom flex justify-end gap-3 bg-black/10 flex-shrink-0">
+                    <button type="button" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer" onclick="closeDrawer()">Cancel</button>
+                    <button type="submit" class="bg-success text-white font-semibold text-xs px-4 py-2.5 rounded hover:bg-opacity-90 transition-all duration-150 cursor-pointer" id="formSubmitBtn">Save Member</button>
+                </div>
+            </form>
         </div>
-        <form id="memberForm" method="POST" action="members?action=add" class="flex flex-col flex-grow overflow-hidden">
-            <?php render_csrf_input(); ?>
-            <input type="hidden" name="id" id="memberId">
-            
-            <div class="overflow-y-auto flex-grow pr-1 flex flex-col gap-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formFirstName" class="text-xs font-semibold text-text-secondary">First Name</label>
-                        <input type="text" name="first_name" id="formFirstName" required placeholder="e.g. John" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formLastName" class="text-xs font-semibold text-text-secondary">Last Name</label>
-                        <input type="text" name="last_name" id="formLastName" placeholder="e.g. Doe" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formGender" class="text-xs font-semibold text-text-secondary">Gender</label>
-                        <select name="gender" id="formGender" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formPhone" class="text-xs font-semibold text-text-secondary">Phone Number</label>
-                        <input type="text" name="phone" id="formPhone" placeholder="e.g. 0244123456" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formEmail" class="text-xs font-semibold text-text-secondary">Email Address</label>
-                        <input type="email" name="email" id="formEmail" placeholder="e.g. john@byc.org" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formBirthday" class="text-xs font-semibold text-text-secondary">Birthday</label>
-                        <input type="date" name="birthday" id="formBirthday" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formJoinDate" class="text-xs font-semibold text-text-secondary">Join Date</label>
-                        <input type="date" name="join_date" id="formJoinDate" value="<?= date('Y-m-d') ?>" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formDept" class="text-xs font-semibold text-text-secondary">Department Assignment</label>
-                        <select name="department_id" id="formDept" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                            <?php foreach ($departments as $dept): ?>
-                                <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formMemberStatus" class="text-xs font-semibold text-text-secondary">Ministry Status</label>
-                        <select name="member_status" id="formMemberStatus" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                            <option value="Member">Member</option>
-                            <option value="Visitor">Visitor</option>
-                            <option value="Adherent">Adherent</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label for="formHousehold" class="text-xs font-semibold text-text-secondary">Household Cohort</label>
-                        <select name="household_id" id="formHousehold" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                            <option value="">-- No Household --</option>
-                            <?php foreach ($households as $house): ?>
-                                <option value="<?= $house['id'] ?>"><?= htmlspecialchars($house['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-1.5">
-                    <label for="formHomeCell" class="text-xs font-semibold text-text-secondary">Home Cell Fellowship</label>
-                    <select name="home_cell_id" id="formHomeCell" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
-                        <option value="">-- No Home Cell --</option>
-                        <?php foreach ($home_cells as $cell): ?>
-                            <option value="<?= $cell['id'] ?>"><?= htmlspecialchars($cell['name']) ?> (<?= htmlspecialchars($cell['location']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="flex flex-wrap gap-4 sm:gap-6 py-1 select-none">
-                    <label class="flex items-center gap-2 cursor-pointer text-xs sm:text-sm text-white font-medium">
-                        <input type="checkbox" name="water_baptized" id="formWaterBaptized" value="1" class="w-4 h-4 rounded border-white/10 bg-black/30 text-primary checked:bg-primary checked:border-primary focus:ring-offset-0 focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer">
-                        <span>Water Baptized</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer text-xs sm:text-sm text-white font-medium">
-                        <input type="checkbox" name="holy_ghost_baptized" id="formHolyGhostBaptized" value="1" class="w-4 h-4 rounded border-white/10 bg-black/30 text-primary checked:bg-primary checked:border-primary focus:ring-offset-0 focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer">
-                        <span>Holy Ghost Baptized</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer text-xs sm:text-sm text-white font-medium">
-                        <input type="checkbox" name="discipleship_completed" id="formDiscipleshipCompleted" value="1" class="w-4 h-4 rounded border-white/10 bg-black/30 text-primary checked:bg-primary checked:border-primary focus:ring-offset-0 focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer">
-                        <span>Discipleship Graduate</span>
-                    </label>
-                </div>
-
-                <div class="flex flex-col gap-1.5 mb-2">
-                    <label for="formAddress" class="text-xs font-semibold text-text-secondary">Residential Address</label>
-                    <textarea name="address" id="formAddress" rows="2" placeholder="e.g. House No. 4, Airport West, Accra" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm"></textarea>
-                </div>
-            </div>
-            
-            <div class="flex justify-end gap-3 border-t border-border-custom pt-4 flex-shrink-0">
-                <button type="button" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2 rounded transition-all duration-150 cursor-pointer" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="bg-success text-white font-semibold text-xs px-4 py-2 rounded hover:bg-opacity-90 transition-all duration-150 cursor-pointer" id="formSubmitBtn">Save Member</button>
-            </div>
-        </form>
     </div>
 </div>
 
 <script>
-const modal = document.getElementById('memberModal');
-const container = document.getElementById('memberModalContainer');
+const drawer = document.getElementById('memberDrawer');
+const backdrop = document.getElementById('drawerBackdrop');
+const panel = document.getElementById('drawerPanel');
 const form = document.getElementById('memberForm');
-const modalTitle = document.getElementById('modalTitle');
+const drawerTitle = document.getElementById('drawerTitle');
 const formSubmitBtn = document.getElementById('formSubmitBtn');
 
 function openAddModal() {
     form.reset();
     form.action = 'members?action=add';
-    modalTitle.textContent = 'Register New Member';
+    drawerTitle.textContent = 'Register New Member';
     formSubmitBtn.textContent = 'Save Member';
     document.getElementById('memberId').value = '';
     
@@ -476,14 +494,20 @@ function openAddModal() {
     document.getElementById('formHolyGhostBaptized').checked = false;
     document.getElementById('formDiscipleshipCompleted').checked = false;
     
-    modal.classList.add('opacity-100', 'pointer-events-auto');
-    container.classList.add('scale-100', 'opacity-100');
+    // Open drawer
+    drawer.classList.remove('invisible');
+    setTimeout(() => {
+        backdrop.classList.remove('opacity-0');
+        backdrop.classList.add('opacity-100');
+        panel.classList.remove('translate-x-full');
+        panel.classList.add('translate-x-0');
+    }, 10);
 }
 
 function openEditModal(member) {
     form.reset();
     form.action = 'members?action=edit';
-    modalTitle.textContent = 'Edit Member Profile';
+    drawerTitle.textContent = 'Edit Member Profile';
     formSubmitBtn.textContent = 'Update Member';
     
     document.getElementById('memberId').value = member.id;
@@ -507,13 +531,24 @@ function openEditModal(member) {
     document.getElementById('formHolyGhostBaptized').checked = (member.holy_ghost_baptized == 1);
     document.getElementById('formDiscipleshipCompleted').checked = (member.discipleship_completed == 1);
     
-    modal.classList.add('opacity-100', 'pointer-events-auto');
-    container.classList.add('scale-100', 'opacity-100');
+    // Open drawer
+    drawer.classList.remove('invisible');
+    setTimeout(() => {
+        backdrop.classList.remove('opacity-0');
+        backdrop.classList.add('opacity-100');
+        panel.classList.remove('translate-x-full');
+        panel.classList.add('translate-x-0');
+    }, 10);
 }
 
-function closeModal() {
-    modal.classList.remove('opacity-100', 'pointer-events-auto');
-    container.classList.remove('scale-100', 'opacity-100');
+function closeDrawer() {
+    backdrop.classList.remove('opacity-100');
+    backdrop.classList.add('opacity-0');
+    panel.classList.remove('translate-x-0');
+    panel.classList.add('translate-x-full');
+    setTimeout(() => {
+        drawer.classList.add('invisible');
+    }, 300);
 }
 
 // Live client-side search filtering
@@ -550,7 +585,7 @@ if (searchInput) {
 
 // Close on escape key
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') closeDrawer();
 });
 </script>
 
