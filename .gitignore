@@ -4,3 +4,6 @@ config.php
 
 # PHP runtime logs
 php_errors.log
+
+# Schema migration script (untracked for security)
+schema.php

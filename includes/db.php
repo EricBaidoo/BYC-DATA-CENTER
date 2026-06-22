@@ -187,4 +187,39 @@ if ($current_page !== 'login.php' && $current_page !== 'logout.php') {
         exit;
     }
 }
+
+// 4. CSRF Security Token Management & Validation Helpers
+if (empty($_SESSION['csrf_token'])) {
+    try {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    } catch (Exception $e) {
+        $_SESSION['csrf_token'] = md5(uniqid(rand(), true));
+    }
+}
+
+function validate_csrf() {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $token = $_POST['csrf_token'] ?? '';
+        if (empty($token) || $token !== $_SESSION['csrf_token']) {
+            die("CSRF validation failed. Unauthorized request.");
+        }
+    } elseif (isset($_GET['action']) && in_array($_GET['action'], ['delete', 'delete_service', 'delete_dept', 'delete_user', 'delete_cell', 'delete_household'])) {
+        // Validate CSRF for GET deletion requests to prevent malicious link triggers
+        $token = $_GET['csrf_token'] ?? '';
+        if (empty($token) || $token !== $_SESSION['csrf_token']) {
+            die("CSRF validation failed for deletion request.");
+        }
+    }
+}
+
+function log_audit_action($action, $target_table, $target_id, $details = '') {
+    global $pdo;
+    try {
+        $user_id = $_SESSION['user_id'] ?? null;
+        $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, target_table, target_id, details) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$user_id, $action, $target_table, $target_id, $details]);
+    } catch (PDOException $e) {
+        error_log("Audit Log failed: " . $e->getMessage());
+    }
+}
 ?>

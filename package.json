@@ -1,0 +1,15 @@
+{
+  "name": "byc-data-center",
+  "version": "1.0.0",
+  "description": "BYC Data Center with Tailwind CSS v4",
+  "main": "index.php",
+  "scripts": {
+    "build": "npx @tailwindcss/cli -i ./assets/css/src/input.css -o ./assets/css/style.css",
+    "watch": "npx @tailwindcss/cli -i ./assets/css/src/input.css -o ./assets/css/style.css --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "tailwindcss": "^4.0.0"
+  }
+}

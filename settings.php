@@ -6,8 +6,9 @@ require_once __DIR__ . '/includes/layout.php';
 $error = '';
 $success = '';
 
-// 1. Handle Actions
+// 1. Handle POST Actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
+    validate_csrf();
     $action = $_GET['action'];
     
     // Add Service Type
@@ -20,10 +21,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             try {
                 $stmt = $pdo->prepare("INSERT INTO services (name, description) VALUES (?, ?)");
                 $stmt->execute([$name, $description]);
+                $new_id = $pdo->lastInsertId();
+                log_audit_action('ADD_SERVICE_TYPE', 'services', $new_id, $name);
                 header("Location: settings?tab=services&msg=Service type created successfully");
                 exit;
             } catch (PDOException $e) {
                 $error = 'Error creating service: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Edit Service Type
+    elseif ($action === 'edit_service') {
+        $id = intval($_POST['id'] ?? 0);
+        $name = trim($_POST['service_name'] ?? '');
+        $description = trim($_POST['service_description'] ?? '');
+        if ($id <= 0 || empty($name)) {
+            $error = 'Service name and ID are required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("UPDATE services SET name = ?, description = ? WHERE id = ?");
+                $stmt->execute([$name, $description, $id]);
+                log_audit_action('EDIT_SERVICE_TYPE', 'services', $id, $name);
+                header("Location: settings?tab=services&msg=Service type updated successfully");
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Error updating service: ' . $e->getMessage();
             }
         }
     }
@@ -38,10 +61,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             try {
                 $stmt = $pdo->prepare("INSERT INTO departments (name, description) VALUES (?, ?)");
                 $stmt->execute([$name, $description]);
+                $new_id = $pdo->lastInsertId();
+                log_audit_action('ADD_DEPARTMENT', 'departments', $new_id, $name);
                 header("Location: settings?tab=departments&msg=Department created successfully");
                 exit;
             } catch (PDOException $e) {
                 $error = 'Error creating department: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Edit Department
+    elseif ($action === 'edit_dept') {
+        $id = intval($_POST['id'] ?? 0);
+        $name = trim($_POST['dept_name'] ?? '');
+        $description = trim($_POST['dept_description'] ?? '');
+        if ($id <= 0 || empty($name)) {
+            $error = 'Department name and ID are required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("UPDATE departments SET name = ?, description = ? WHERE id = ?");
+                $stmt->execute([$name, $description, $id]);
+                log_audit_action('EDIT_DEPARTMENT', 'departments', $id, $name);
+                header("Location: settings?tab=departments&msg=Department updated successfully");
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Error updating department: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Add Home Cell
+    elseif ($action === 'add_cell') {
+        $name = trim($_POST['cell_name'] ?? '');
+        $leader_id = !empty($_POST['leader_id']) ? intval($_POST['leader_id']) : null;
+        $location = trim($_POST['location'] ?? '');
+        $meeting_day = trim($_POST['meeting_day'] ?? '');
+        if (empty($name)) {
+            $error = 'Cell Group name is required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("INSERT INTO home_cells (name, leader_id, location, meeting_day) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$name, $leader_id, $location, $meeting_day]);
+                $new_id = $pdo->lastInsertId();
+                log_audit_action('ADD_HOME_CELL', 'home_cells', $new_id, $name);
+                header("Location: settings?tab=cells&msg=Home Cell Group created successfully");
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Error creating cell group: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Edit Home Cell
+    elseif ($action === 'edit_cell') {
+        $id = intval($_POST['id'] ?? 0);
+        $name = trim($_POST['cell_name'] ?? '');
+        $leader_id = !empty($_POST['leader_id']) ? intval($_POST['leader_id']) : null;
+        $location = trim($_POST['location'] ?? '');
+        $meeting_day = trim($_POST['meeting_day'] ?? '');
+        if ($id <= 0 || empty($name)) {
+            $error = 'Cell Group name and ID are required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("UPDATE home_cells SET name = ?, leader_id = ?, location = ?, meeting_day = ? WHERE id = ?");
+                $stmt->execute([$name, $leader_id, $location, $meeting_day, $id]);
+                log_audit_action('EDIT_HOME_CELL', 'home_cells', $id, $name);
+                header("Location: settings?tab=cells&msg=Home Cell Group updated successfully");
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Error updating cell group: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Add Household
+    elseif ($action === 'add_household') {
+        $name = trim($_POST['household_name'] ?? '');
+        $address = trim($_POST['address'] ?? '');
+        if (empty($name)) {
+            $error = 'Household name is required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("INSERT INTO households (name, address) VALUES (?, ?)");
+                $stmt->execute([$name, $address]);
+                $new_id = $pdo->lastInsertId();
+                log_audit_action('ADD_HOUSEHOLD', 'households', $new_id, $name);
+                header("Location: settings?tab=households&msg=Household cohort created successfully");
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Error creating household: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Edit Household
+    elseif ($action === 'edit_household') {
+        $id = intval($_POST['id'] ?? 0);
+        $name = trim($_POST['household_name'] ?? '');
+        $address = trim($_POST['address'] ?? '');
+        if ($id <= 0 || empty($name)) {
+            $error = 'Household name and ID are required.';
+        } else {
+            try {
+                $stmt = $pdo->prepare("UPDATE households SET name = ?, address = ? WHERE id = ?");
+                $stmt->execute([$name, $address, $id]);
+                log_audit_action('EDIT_HOUSEHOLD', 'households', $id, $name);
+                header("Location: settings?tab=households&msg=Household cohort updated successfully");
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Error updating household: ' . $e->getMessage();
             }
         }
     }
@@ -64,6 +193,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                     $pass_hash = password_hash($password, PASSWORD_DEFAULT);
                     $stmt = $pdo->prepare("INSERT INTO users (username, password, name) VALUES (?, ?, ?)");
                     $stmt->execute([$username, $pass_hash, $name]);
+                    $new_id = $pdo->lastInsertId();
+                    
+                    log_audit_action('ADD_USER', 'users', $new_id, $username);
+                    
                     header("Location: settings?tab=users&msg=User account created successfully");
                     exit;
                 }
@@ -97,6 +230,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                         $stmt = $pdo->prepare("UPDATE users SET username = ?, name = ? WHERE id = ?");
                         $stmt->execute([$username, $name, $id]);
                     }
+                    
+                    log_audit_action('EDIT_USER', 'users', $id, $username);
                     
                     if ($id === $_SESSION['user_id']) {
                         $_SESSION['username'] = $username;
@@ -184,6 +319,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                     }
                 }
                 
+                log_audit_action('UPDATE_SITE_SETTINGS', 'site_settings', 0);
+                
                 if (empty($error)) {
                     header("Location: settings?tab=system&msg=Site settings updated successfully");
                     exit;
@@ -214,14 +351,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 $stmt_set = $pdo->prepare("UPDATE site_settings SET setting_value = ? WHERE setting_key = 'active_session_id'");
                 $stmt_set->execute([$attendance_id]);
                 
-                // 3. Pre-populate all current members in member_attendance as 'Absent'
-                $members = $pdo->query("SELECT id FROM members")->fetchAll(PDO::FETCH_COLUMN);
+                // 3. Pre-populate all active members in member_attendance as 'Absent'
+                $members = $pdo->query("SELECT id FROM members WHERE deleted_at IS NULL")->fetchAll(PDO::FETCH_COLUMN);
                 $stmt_ma = $pdo->prepare("INSERT IGNORE INTO member_attendance (member_id, attendance_id, status) VALUES (?, ?, 'Absent')");
                 foreach ($members as $member_id) {
                     $stmt_ma->execute([$member_id, $attendance_id]);
                 }
                 
                 $pdo->commit();
+                
+                log_audit_action('START_SERVICE_SESSION', 'attendance', $attendance_id);
                 
                 header("Location: settings?tab=sessions&msg=Service session started successfully. Go to the Attendance page to take attendance.");
                 exit;
@@ -235,8 +374,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
     // Close Service Session
     elseif ($action === 'close_session') {
         try {
+            $active_id = $GLOBALS['site_settings']['active_session_id'] ?? 0;
             $stmt_set = $pdo->prepare("UPDATE site_settings SET setting_value = '' WHERE setting_key = 'active_session_id'");
             $stmt_set->execute();
+            
+            log_audit_action('CLOSE_SERVICE_SESSION', 'attendance', $active_id);
+            
             header("Location: settings?tab=sessions&msg=Service session closed successfully");
             exit;
         } catch (PDOException $e) {
@@ -247,6 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
 
 // 2. Handle GET Deletions
 if (isset($_GET['action'])) {
+    validate_csrf();
     $action = $_GET['action'];
     $id = intval($_GET['id'] ?? 0);
     
@@ -254,6 +398,7 @@ if (isset($_GET['action'])) {
         try {
             $stmt = $pdo->prepare("DELETE FROM services WHERE id = ?");
             $stmt->execute([$id]);
+            log_audit_action('DELETE_SERVICE_TYPE', 'services', $id);
             header("Location: settings?tab=services&msg=Service type deleted successfully");
             exit;
         } catch (PDOException $e) {
@@ -273,11 +418,36 @@ if (isset($_GET['action'])) {
             } else {
                 $stmt = $pdo->prepare("DELETE FROM departments WHERE id = ?");
                 $stmt->execute([$id]);
+                log_audit_action('DELETE_DEPARTMENT', 'departments', $id);
                 header("Location: settings?tab=departments&msg=Department deleted successfully");
                 exit;
             }
         } catch (PDOException $e) {
             $error = 'Error deleting department: ' . $e->getMessage();
+        }
+    }
+    
+    elseif ($action === 'delete_cell' && $id > 0) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM home_cells WHERE id = ?");
+            $stmt->execute([$id]);
+            log_audit_action('DELETE_HOME_CELL', 'home_cells', $id);
+            header("Location: settings?tab=cells&msg=Home Cell Group deleted successfully");
+            exit;
+        } catch (PDOException $e) {
+            $error = 'Error deleting cell group: ' . $e->getMessage();
+        }
+    }
+    
+    elseif ($action === 'delete_household' && $id > 0) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM households WHERE id = ?");
+            $stmt->execute([$id]);
+            log_audit_action('DELETE_HOUSEHOLD', 'households', $id);
+            header("Location: settings?tab=households&msg=Household cohort deleted successfully");
+            exit;
+        } catch (PDOException $e) {
+            $error = 'Error deleting household: ' . $e->getMessage();
         }
     }
     
@@ -292,6 +462,7 @@ if (isset($_GET['action'])) {
                 } else {
                     $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
                     $stmt->execute([$id]);
+                    log_audit_action('DELETE_USER', 'users', $id);
                     header("Location: settings?tab=users&msg=User account deleted successfully");
                     exit;
                 }
@@ -310,6 +481,31 @@ if (isset($_GET['msg'])) {
 $services = $pdo->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $departments = $pdo->query("SELECT * FROM departments ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $users = $pdo->query("SELECT id, username, name, created_at FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Shepherding engine fetches
+$cells = $pdo->query("
+    SELECT c.*, CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')) AS leader_name 
+    FROM home_cells c 
+    LEFT JOIN members m ON c.leader_id = m.id 
+    ORDER BY c.name ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$households = $pdo->query("SELECT * FROM households ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+$audit_logs = $pdo->query("
+    SELECT a.*, u.username, u.name as user_name 
+    FROM audit_logs a 
+    LEFT JOIN users u ON a.user_id = u.id 
+    ORDER BY a.created_at DESC 
+    LIMIT 100
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$all_members = $pdo->query("
+    SELECT id, CONCAT(first_name, ' ', COALESCE(last_name, '')) as name 
+    FROM members 
+    WHERE deleted_at IS NULL 
+    ORDER BY first_name ASC, last_name ASC
+")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch active session state if running
 $active_session_id = $GLOBALS['site_settings']['active_session_id'] ?? '';
@@ -333,78 +529,83 @@ render_header('Settings & Administration', 'settings');
 
 <!-- Action Status Alert -->
 <?php if (!empty($error)): ?>
-    <div style="background: var(--danger-glow); border: 0.0625rem solid var(--danger); color: var(--danger); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+    <div class="bg-danger/15 border border-danger text-danger p-4 rounded-md mb-6 text-sm font-semibold">
         <?= htmlspecialchars($error) ?>
     </div>
 <?php endif; ?>
 <?php if (!empty($success)): ?>
-    <div style="background: var(--secondary-glow); border: 0.0625rem solid var(--secondary); color: var(--secondary); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+    <div class="bg-secondary/15 border border-secondary text-secondary p-4 rounded-md mb-6 text-sm font-semibold">
         <?= htmlspecialchars($success) ?>
     </div>
 <?php endif; ?>
 
 <!-- Settings Tab Navigation -->
-<div class="settings-tabs">
-    <button class="settings-tab-btn <?= $active_tab === 'sessions' ? 'active' : '' ?>" onclick="switchTab('sessions')">Service Sessions</button>
-    <button class="settings-tab-btn <?= $active_tab === 'services' ? 'active' : '' ?>" onclick="switchTab('services')">Service Types</button>
-    <button class="settings-tab-btn <?= $active_tab === 'departments' ? 'active' : '' ?>" onclick="switchTab('departments')">Departments</button>
-    <button class="settings-tab-btn <?= $active_tab === 'users' ? 'active' : '' ?>" onclick="switchTab('users')">User Accounts</button>
-    <button class="settings-tab-btn <?= $active_tab === 'system' ? 'active' : '' ?>" onclick="switchTab('system')">Site Settings</button>
+<div class="flex gap-1.5 border-b border-border-custom mb-8 overflow-x-auto pb-1 select-none whitespace-nowrap">
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'sessions' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('sessions')">Service Sessions</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'services' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('services')">Service Types</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'departments' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('departments')">Departments</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'cells' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('cells')">Home Cells</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'households' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('households')">Households</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'users' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('users')">User Accounts</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'system' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('system')">Site Settings</button>
+    <button class="px-4 py-2.5 bg-transparent border-none border-b-2 border-transparent text-text-secondary hover:text-text-primary font-heading font-semibold text-sm transition-all duration-200 shrink-0 cursor-pointer <?= $active_tab === 'audit' ? 'text-primary! border-b-primary!' : '' ?>" onclick="switchTab('audit')">Audit Logs</button>
 </div>
 
 <!-- Tab: Service Sessions Control -->
-<div id="tabContent-sessions" class="settings-tab-content <?= $active_tab === 'sessions' ? 'active' : '' ?>">
-    <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 37.5rem; margin: 0 auto;">
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Active Service Session</h2>
+<div id="tabContent-sessions" class="settings-tab-content <?= $active_tab === 'sessions' ? 'block' : 'hidden' ?>">
+    <div class="max-w-[480px] mx-auto">
+        <div class="bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 sm:p-7">
+            <div class="flex justify-between items-center mb-5 border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white">Active Service Session</h2>
             </div>
             
             <?php if ($active_session): ?>
-                <div style="background: rgba(6, 182, 212, 0.08); border: 0.0625rem solid var(--secondary); padding: 1.5rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; text-align: center;">
-                    <span class="badge badge-success" style="margin-bottom: 0.75rem; font-size: 0.8rem; padding: 0.35rem 0.75rem;">LIVE SESSION RUNNING</span>
-                    <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.25rem; color: var(--text-primary);">
+                <div class="bg-secondary/10 border border-secondary/35 p-6 rounded-md mb-5 text-center flex flex-col items-center">
+                    <span class="inline-block bg-secondary/20 text-secondary text-2xs px-2.5 py-1 rounded font-bold uppercase tracking-wider mb-3">LIVE SESSION RUNNING</span>
+                    <h3 class="text-lg font-bold text-white mb-1">
                         <?= htmlspecialchars($active_session['service_name']) ?>
                     </h3>
-                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+                    <p class="text-xs text-text-secondary mb-5">
                         Started on <?= date('l, M d, Y', strtotime($active_session['date'])) ?>
                     </p>
                     
-                    <a href="attendance" class="btn btn-primary" style="display: inline-flex; justify-content: center; width: auto; padding: 0.6rem 1.5rem; margin-right: 0.75rem;">
-                        Take Attendance
-                    </a>
-                    
-                    <form method="POST" action="settings?action=close_session" style="display: inline-block; margin: 0;">
-                        <button type="submit" class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger); padding: 0.6rem 1.5rem;" onclick="return confirm('Are you sure you want to close this service session? After closing, attendance for this session can no longer be updated live.')">
-                            Close Session
-                        </button>
-                    </form>
+                    <div class="flex gap-3 justify-center w-full">
+                        <a href="attendance" class="bg-primary hover:bg-opacity-90 text-white font-semibold text-xs px-4 py-2.5 rounded shadow-md active:scale-95 transition-all duration-150 flex items-center justify-center gap-1.5" style="text-decoration: none;">
+                            Take Attendance
+                        </a>
+                        
+                        <form method="POST" action="settings?action=close_session" class="m-0">
+                            <button type="submit" class="bg-bg-surface-solid text-danger border border-danger/30 hover:bg-danger/10 font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer" onclick="return confirm('Are you sure you want to close this service session? After closing, attendance for this session can no longer be updated live.')">
+                                Close Session
+                            </button>
+                        </form>
+                    </div>
                 </div>
             <?php else: ?>
-                <div style="background: rgba(255, 255, 255, 0.02); border: 0.0625rem solid var(--border-color); padding: 1.5rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; text-align: center;">
-                    <p style="color: var(--text-muted); margin-bottom: 0;">No active service session is running. Start one below to begin taking attendance.</p>
+                <div class="bg-white/[0.015] border border-border-custom p-6 rounded-md mb-5 text-center">
+                    <p class="text-xs text-text-secondary">No active service session is running. Start one below to begin taking attendance.</p>
                 </div>
                 
                 <?php if (empty($services)): ?>
-                    <p style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">Please define at least one service type in the <strong>Service Types</strong> tab before starting a session.</p>
+                    <p class="text-text-muted text-xs text-center py-4">Please define at least one service type in the <strong class="text-primary">Service Types</strong> tab before starting a session.</p>
                 <?php else: ?>
-                    <form method="POST" action="settings?action=start_session">
-                        <div class="form-grid" style="grid-template-columns: 1fr; gap: 1.25rem;">
-                            <div class="form-group">
-                                <label for="sessServiceId">Select Service Type</label>
-                                <select name="service_id" id="sessServiceId" required>
+                    <form method="POST" action="settings?action=start_session" class="flex flex-col gap-4">
+                        <div class="flex flex-col gap-4">
+                            <div class="flex flex-col gap-1.5">
+                                <label for="sessServiceId" class="text-xs font-semibold text-text-secondary">Select Service Type</label>
+                                <select name="service_id" id="sessServiceId" required class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                                     <option value="">-- Choose Service --</option>
                                     <?php foreach ($services as $srv): ?>
                                         <option value="<?= $srv['id'] ?>"><?= htmlspecialchars($srv['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="sessDate">Session Date</label>
-                                <input type="date" name="date" id="sessDate" required value="<?= date('Y-m-d') ?>">
+                            <div class="flex flex-col gap-1.5">
+                                <label for="sessDate" class="text-xs font-semibold text-text-secondary">Session Date</label>
+                                <input type="date" name="date" id="sessDate" required value="<?= date('Y-m-d') ?>" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-success" style="margin-top: 1.5rem; width: 100%; justify-content: center;">
+                        <button type="submit" class="w-full bg-success hover:bg-opacity-90 text-white font-semibold text-sm py-2.5 px-4 rounded shadow-md active:scale-98 transition-all duration-150 cursor-pointer flex justify-center items-center mt-2">
                             Start Service Session
                         </button>
                     </form>
@@ -415,51 +616,59 @@ render_header('Settings & Administration', 'settings');
 </div>
 
 <!-- Tab 1: Service Types Management -->
-<div id="tabContent-services" class="settings-tab-content <?= $active_tab === 'services' ? 'active' : '' ?>">
-    <div class="dashboard-grid">
-        <!-- Add Service Form -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Add Service Type</h2>
+<div id="tabContent-services" class="settings-tab-content <?= $active_tab === 'services' ? 'block' : 'hidden' ?>">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add/Edit Service Form -->
+        <div class="lg:col-span-1 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 self-start">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white" id="srvFormTitle">Add Service Type</h2>
             </div>
-            <form method="POST" action="settings?action=add_service">
-                <div class="form-group" style="margin-bottom: 1.25rem;">
-                    <label for="srvName">Service Name</label>
-                    <input type="text" name="service_name" id="srvName" required placeholder="e.g. Wednesday Communion Service">
+            <form id="srvForm" method="POST" action="settings?action=add_service" class="flex flex-col gap-4">
+                <?php render_csrf_input(); ?>
+                <input type="hidden" name="id" id="formSrvId">
+                <div class="flex flex-col gap-1.5">
+                    <label for="srvName" class="text-xs font-semibold text-text-secondary">Service Name</label>
+                    <input type="text" name="service_name" id="srvName" required placeholder="e.g. Wednesday Communion Service" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="srvDesc">Description</label>
-                    <textarea name="service_description" id="srvDesc" rows="3" placeholder="Brief description of when this service runs or its target audience..."></textarea>
+                <div class="flex flex-col gap-1.5">
+                    <label for="srvDesc" class="text-xs font-semibold text-text-secondary">Description</label>
+                    <textarea name="service_description" id="srvDesc" rows="3" placeholder="Brief description of when this service runs..." class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm"></textarea>
                 </div>
-                <button type="submit" class="btn btn-success" style="width: 100%; justify-content: center;">Save Service Type</button>
+                <div class="flex gap-2.5 mt-2">
+                    <button type="submit" id="srvSubmitBtn" class="bg-success text-white font-semibold text-xs px-4 py-2.5 rounded hover:bg-opacity-90 active:scale-95 transition-all duration-150 cursor-pointer flex-grow justify-center">Save Service Type</button>
+                    <button type="button" id="srvCancelBtn" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer hidden justify-center" onclick="resetSrvForm()">Cancel</button>
+                </div>
             </form>
         </div>
         
         <!-- List of Service Types -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Current Service Definitions</h2>
+        <div class="lg:col-span-2 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 overflow-x-auto">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white">Current Service Definitions</h2>
             </div>
-            <div class="table-container">
+            <div class="w-full max-w-full">
                 <?php if (empty($services)): ?>
-                    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No service types defined.</p>
+                    <p class="text-text-muted text-xs text-center py-8">No service types defined.</p>
                 <?php else: ?>
-                    <table>
+                    <table class="w-full border-collapse text-left min-w-[500px]">
                         <thead>
-                            <tr>
-                                <th>Name & Description</th>
-                                <th style="text-align: right;">Action</th>
+                            <tr class="border-b border-border-custom">
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Name & Description</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($services as $srv): ?>
-                                <tr>
-                                    <td>
-                                        <strong><?= htmlspecialchars($srv['name']) ?></strong>
-                                        <div style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($srv['description'] ?: 'No description.') ?></div>
+                                <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                    <td class="p-3">
+                                        <strong class="text-sm text-white block leading-snug"><?= htmlspecialchars($srv['name']) ?></strong>
+                                        <div class="text-xs text-text-secondary mt-0.5"><?= htmlspecialchars($srv['description'] ?: 'No description.') ?></div>
                                     </td>
-                                    <td style="text-align: right;">
-                                        <a href="settings?action=delete_service&id=<?= $srv['id'] ?>" class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="return confirm('Deleting this service will permanently delete all logged sessions and attendance mapped to it. Continue?')">Delete</a>
+                                    <td class="p-3 text-right">
+                                        <div class="inline-flex gap-1.5">
+                                            <button class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 cursor-pointer" onclick='openEditSrvMode(<?= json_encode($srv) ?>)'>Edit</button>
+                                            <a href="settings?action=delete_service&id=<?= $srv['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="bg-bg-surface-solid border border-border-custom hover:border-danger/30 hover:bg-danger/10 text-text-secondary hover:text-danger font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 text-center" onclick="return confirm('Deleting this service will permanently delete all logged sessions and attendance mapped to it. Continue?')" style="text-decoration: none;">Delete</a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -472,54 +681,62 @@ render_header('Settings & Administration', 'settings');
 </div>
 
 <!-- Tab 2: Departments Management -->
-<div id="tabContent-departments" class="settings-tab-content <?= $active_tab === 'departments' ? 'active' : '' ?>">
-    <div class="dashboard-grid">
-        <!-- Add Department Form -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Create Department</h2>
+<div id="tabContent-departments" class="settings-tab-content <?= $active_tab === 'departments' ? 'block' : 'hidden' ?>">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add/Edit Department Form -->
+        <div class="lg:col-span-1 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 self-start">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white" id="deptFormTitle">Create Department</h2>
             </div>
-            <form method="POST" action="settings?action=add_dept">
-                <div class="form-group" style="margin-bottom: 1.25rem;">
-                    <label for="deptName">Department Name</label>
-                    <input type="text" name="dept_name" id="deptName" required placeholder="e.g. Media & Tech Team">
+            <form id="deptForm" method="POST" action="settings?action=add_dept" class="flex flex-col gap-4">
+                <?php render_csrf_input(); ?>
+                <input type="hidden" name="id" id="formDeptId">
+                <div class="flex flex-col gap-1.5">
+                    <label for="deptName" class="text-xs font-semibold text-text-secondary">Department Name</label>
+                    <input type="text" name="dept_name" id="deptName" required placeholder="e.g. Media & Tech Team" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="deptDesc">Description</label>
-                    <textarea name="dept_description" id="deptDesc" rows="3" placeholder="Brief description of tasks, responsibilities, or roles in this workforce cohort..."></textarea>
+                <div class="flex flex-col gap-1.5">
+                    <label for="deptDesc" class="text-xs font-semibold text-text-secondary">Description</label>
+                    <textarea name="dept_description" id="deptDesc" rows="3" placeholder="Brief description of workforce cohort role..." class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm"></textarea>
                 </div>
-                <button type="submit" class="btn btn-success" style="width: 100%; justify-content: center;">Save Department</button>
+                <div class="flex gap-2.5 mt-2">
+                    <button type="submit" id="deptSubmitBtn" class="bg-success text-white font-semibold text-xs px-4 py-2.5 rounded hover:bg-opacity-90 active:scale-95 transition-all duration-150 cursor-pointer flex-grow justify-center">Save Department</button>
+                    <button type="button" id="deptCancelBtn" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer hidden justify-center" onclick="resetDeptForm()">Cancel</button>
+                </div>
             </form>
         </div>
         
         <!-- List of Departments -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Current Department Structures</h2>
+        <div class="lg:col-span-2 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 overflow-x-auto">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white">Current Department Structures</h2>
             </div>
-            <div class="table-container">
+            <div class="w-full max-w-full">
                 <?php if (empty($departments)): ?>
-                    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No departments defined.</p>
+                    <p class="text-text-muted text-xs text-center py-8">No departments defined.</p>
                 <?php else: ?>
-                    <table>
+                    <table class="w-full border-collapse text-left min-w-[500px]">
                         <thead>
-                            <tr>
-                                <th>Name & Description</th>
-                                <th style="text-align: right;">Action</th>
+                            <tr class="border-b border-border-custom">
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Name & Description</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($departments as $dept): ?>
-                                <tr>
-                                    <td>
-                                        <strong><?= htmlspecialchars($dept['name']) ?></strong>
-                                        <div style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($dept['description'] ?: 'No description.') ?></div>
+                                <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                    <td class="p-3">
+                                        <strong class="text-sm text-white block leading-snug"><?= htmlspecialchars($dept['name']) ?></strong>
+                                        <div class="text-xs text-text-secondary mt-0.5"><?= htmlspecialchars($dept['description'] ?: 'No description.') ?></div>
                                     </td>
-                                    <td style="text-align: right;">
+                                    <td class="p-3 text-right">
                                         <?php if ($dept['name'] !== 'None'): ?>
-                                            <a href="settings?action=delete_dept&id=<?= $dept['id'] ?>" class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="return confirm('Are you sure you want to delete this department? All assigned members will have their department reset to None.')">Delete</a>
+                                            <div class="inline-flex gap-1.5">
+                                                <button class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 cursor-pointer" onclick='openEditDeptMode(<?= json_encode($dept) ?>)'>Edit</button>
+                                                <a href="settings?action=delete_dept&id=<?= $dept['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="bg-bg-surface-solid border border-border-custom hover:border-danger/30 hover:bg-danger/10 text-text-secondary hover:text-danger font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 text-center" onclick="return confirm('Are you sure you want to delete this department? All assigned members will have their department reset to None.')" style="text-decoration: none;">Delete</a>
+                                            </div>
                                         <?php else: ?>
-                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Protected System Default</span>
+                                            <span class="text-xs text-text-muted italic pr-2">Protected System Default</span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -532,68 +749,217 @@ render_header('Settings & Administration', 'settings');
     </div>
 </div>
 
-<!-- Tab 3: User Accounts Management -->
-<div id="tabContent-users" class="settings-tab-content <?= $active_tab === 'users' ? 'active' : '' ?>">
-    <div class="dashboard-grid">
-        <!-- Add/Edit User Form -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title" id="userFormTitle">Register New User</h2>
+<!-- Tab: Home Cells Management -->
+<div id="tabContent-cells" class="settings-tab-content <?= $active_tab === 'cells' ? 'block' : 'hidden' ?>">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add/Edit Cell Form -->
+        <div class="lg:col-span-1 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 self-start">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white" id="cellFormTitle">Create Cell Group</h2>
             </div>
-            <form id="userForm" method="POST" action="settings?action=add_user">
+            <form id="cellForm" method="POST" action="settings?action=add_cell" class="flex flex-col gap-4">
+                <?php render_csrf_input(); ?>
+                <input type="hidden" name="id" id="formCellId">
+                <div class="flex flex-col gap-1.5">
+                    <label for="cellName" class="text-xs font-semibold text-text-secondary">Cell Group Name</label>
+                    <input type="text" name="cell_name" id="cellName" required placeholder="e.g. Grace Center Cell" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label for="cellLeader" class="text-xs font-semibold text-text-secondary">Cell Leader</label>
+                    <select name="leader_id" id="cellLeader" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        <option value="">-- No Leader Assigned --</option>
+                        <?php foreach ($all_members as $m): ?>
+                            <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label for="cellLocation" class="text-xs font-semibold text-text-secondary">Location / Neighborhood</label>
+                    <input type="text" name="location" id="cellLocation" placeholder="e.g. East Legon, Accra" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label for="cellDay" class="text-xs font-semibold text-text-secondary">Meeting Day & Time</label>
+                    <input type="text" name="meeting_day" id="cellDay" placeholder="e.g. Friday 7:00 PM" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                <div class="flex gap-2.5 mt-2">
+                    <button type="submit" id="cellSubmitBtn" class="bg-success text-white font-semibold text-xs px-4 py-2.5 rounded hover:bg-opacity-90 active:scale-95 transition-all duration-150 cursor-pointer flex-grow justify-center">Save Cell Group</button>
+                    <button type="button" id="cellCancelBtn" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer hidden justify-center" onclick="resetCellForm()">Cancel</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- List of Home Cells -->
+        <div class="lg:col-span-2 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 overflow-x-auto">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white">Current Cell Fellowships</h2>
+            </div>
+            <div class="w-full max-w-full">
+                <?php if (empty($cells)): ?>
+                    <p class="text-text-muted text-xs text-center py-8">No Home Cell fellowships defined.</p>
+                <?php else: ?>
+                    <table class="w-full border-collapse text-left min-w-[650px]">
+                        <thead>
+                            <tr class="border-b border-border-custom">
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Cell Group & Location</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Meeting Info</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Leader</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($cells as $c): ?>
+                                <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                    <td class="p-3">
+                                        <strong class="text-sm text-white block leading-snug"><?= htmlspecialchars($c['name']) ?></strong>
+                                        <div class="text-xs text-text-secondary mt-0.5"><?= htmlspecialchars($c['location'] ?: 'No location.') ?></div>
+                                    </td>
+                                    <td class="p-3 text-sm text-text-primary font-medium"><?= htmlspecialchars($c['meeting_day'] ?: 'Not set.') ?></td>
+                                    <td class="p-3 text-sm text-text-primary"><?= htmlspecialchars($c['leader_name'] ?: 'No leader.') ?></td>
+                                    <td class="p-3 text-right">
+                                        <div class="inline-flex gap-1.5">
+                                            <button class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 cursor-pointer" onclick='openEditCellMode(<?= json_encode($c) ?>)'>Edit</button>
+                                            <a href="settings?action=delete_cell&id=<?= $c['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="bg-bg-surface-solid border border-border-custom hover:border-danger/30 hover:bg-danger/10 text-text-secondary hover:text-danger font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 text-center" onclick="return confirm('Are you sure you want to delete this Home Cell group?')" style="text-decoration: none;">Delete</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Households Management -->
+<div id="tabContent-households" class="settings-tab-content <?= $active_tab === 'households' ? 'block' : 'hidden' ?>">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add/Edit Household Form -->
+        <div class="lg:col-span-1 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 self-start">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white" id="houseFormTitle">Create Household</h2>
+            </div>
+            <form id="houseForm" method="POST" action="settings?action=add_household" class="flex flex-col gap-4">
+                <?php render_csrf_input(); ?>
+                <input type="hidden" name="id" id="formHouseId">
+                <div class="flex flex-col gap-1.5">
+                    <label for="houseName" class="text-xs font-semibold text-text-secondary">Household Family Name</label>
+                    <input type="text" name="household_name" id="houseName" required placeholder="e.g. The Boateng Family" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label for="houseAddress" class="text-xs font-semibold text-text-secondary">Primary Address</label>
+                    <textarea name="address" id="houseAddress" rows="3" placeholder="Family residence address..." class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm"></textarea>
+                </div>
+                <div class="flex gap-2.5 mt-2">
+                    <button type="submit" id="houseSubmitBtn" class="bg-success text-white font-semibold text-xs px-4 py-2.5 rounded hover:bg-opacity-90 active:scale-95 transition-all duration-150 cursor-pointer flex-grow justify-center">Save Household</button>
+                    <button type="button" id="houseCancelBtn" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer hidden justify-center" onclick="resetHouseForm()">Cancel</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- List of Households -->
+        <div class="lg:col-span-2 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 overflow-x-auto">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white">Current Household Cohorts</h2>
+            </div>
+            <div class="w-full max-w-full">
+                <?php if (empty($households)): ?>
+                    <p class="text-text-muted text-xs text-center py-8">No household cohorts defined.</p>
+                <?php else: ?>
+                    <table class="w-full border-collapse text-left min-w-[500px]">
+                        <thead>
+                            <tr class="border-b border-border-custom">
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Household</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Primary Residence</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($households as $h): ?>
+                                <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                    <td class="p-3 text-sm font-semibold text-white"><?= htmlspecialchars($h['name']) ?></td>
+                                    <td class="p-3 text-sm text-text-primary truncate max-w-xs" title="<?= htmlspecialchars($h['address']) ?>"><?= htmlspecialchars($h['address'] ?: 'No address logged.') ?></td>
+                                    <td class="p-3 text-right">
+                                        <div class="inline-flex gap-1.5">
+                                            <button class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 cursor-pointer" onclick='openEditHouseMode(<?= json_encode($h) ?>)'>Edit</button>
+                                            <a href="settings?action=delete_household&id=<?= $h['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="bg-bg-surface-solid border border-border-custom hover:border-danger/30 hover:bg-danger/10 text-text-secondary hover:text-danger font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 text-center" onclick="return confirm('Are you sure you want to delete this household? Linked members will be detached.')" style="text-decoration: none;">Delete</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab 3: User Accounts Management -->
+<div id="tabContent-users" class="settings-tab-content <?= $active_tab === 'users' ? 'block' : 'hidden' ?>">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add/Edit User Form -->
+        <div class="lg:col-span-1 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 self-start">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white" id="userFormTitle">Register New User</h2>
+            </div>
+            <form id="userForm" method="POST" action="settings?action=add_user" class="flex flex-col gap-4">
+                <?php render_csrf_input(); ?>
                 <input type="hidden" name="id" id="formUserId">
                 
-                <div class="form-group" style="margin-bottom: 1.25rem;">
-                    <label for="formUserName">Display Name</label>
-                    <input type="text" name="name" id="formUserName" required placeholder="e.g. John Doe">
+                <div class="flex flex-col gap-1.5">
+                    <label for="formUserName" class="text-xs font-semibold text-text-secondary">Display Name</label>
+                    <input type="text" name="name" id="formUserName" required placeholder="e.g. John Doe" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
-                <div class="form-group" style="margin-bottom: 1.25rem;">
-                    <label for="formUserUsername">Username</label>
-                    <input type="text" name="username" id="formUserUsername" required placeholder="e.g. johndoe">
+                <div class="flex flex-col gap-1.5">
+                    <label for="formUserUsername" class="text-xs font-semibold text-text-secondary">Username</label>
+                    <input type="text" name="username" id="formUserUsername" required placeholder="e.g. johndoe" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="formUserPassword" id="formUserPasswordLabel">Password</label>
-                    <input type="password" name="password" id="formUserPassword" required placeholder="Enter password...">
+                <div class="flex flex-col gap-1.5">
+                    <label for="formUserPassword" id="formUserPasswordLabel" class="text-xs font-semibold text-text-secondary">Password</label>
+                    <input type="password" name="password" id="formUserPassword" required placeholder="Enter password..." class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
                 
-                <div style="display: flex; gap: 0.75rem;">
-                    <button type="submit" id="userSubmitBtn" class="btn btn-success" style="flex-grow: 1; justify-content: center;">Save User</button>
-                    <button type="button" id="userCancelBtn" class="btn btn-secondary" style="display: none; justify-content: center;" onclick="resetUserForm()">Cancel</button>
+                <div class="flex gap-2.5 mt-2">
+                    <button type="submit" id="userSubmitBtn" class="bg-success text-white font-semibold text-xs px-4 py-2.5 rounded hover:bg-opacity-90 active:scale-95 transition-all duration-150 cursor-pointer flex-grow justify-center">Save User</button>
+                    <button type="button" id="userCancelBtn" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2.5 rounded transition-all duration-150 cursor-pointer hidden justify-center" onclick="resetUserForm()">Cancel</button>
                 </div>
             </form>
         </div>
         
         <!-- List of Users -->
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Active User Accounts</h2>
+        <div class="lg:col-span-2 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 overflow-x-auto">
+            <div class="flex justify-between items-center border-b border-border-custom pb-3">
+                <h2 class="font-heading font-bold text-base sm:text-lg text-white">Active User Accounts</h2>
             </div>
-            <div class="table-container">
+            <div class="w-full max-w-full">
                 <?php if (empty($users)): ?>
-                    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">No user accounts found.</p>
+                    <p class="text-text-muted text-xs text-center py-8">No user accounts found.</p>
                 <?php else: ?>
-                    <table>
+                    <table class="w-full border-collapse text-left min-w-[500px]">
                         <thead>
-                            <tr>
-                                <th>Name & Username</th>
-                                <th>Created Date</th>
-                                <th style="text-align: right;">Actions</th>
+                            <tr class="border-b border-border-custom">
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Name & Username</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Created Date</th>
+                                <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($users as $usr): ?>
-                                <tr>
-                                    <td>
-                                        <strong><?= htmlspecialchars($usr['name'] ?: 'No Name') ?></strong>
-                                        <div style="font-size: 0.75rem; color: var(--text-muted);">@<?= htmlspecialchars($usr['username']) ?></div>
+                                <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                    <td class="p-3">
+                                        <strong class="text-sm text-white block leading-snug"><?= htmlspecialchars($usr['name'] ?: 'No Name') ?></strong>
+                                        <div class="text-xs text-text-secondary mt-0.5">@<?= htmlspecialchars($usr['username']) ?></div>
                                     </td>
-                                    <td><?= date('M d, Y', strtotime($usr['created_at'])) ?></td>
-                                    <td style="text-align: right;">
-                                        <button class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;" onclick='openEditUserMode(<?= json_encode($usr) ?>)'>Edit</button>
+                                    <td class="p-3 text-sm text-text-primary font-medium"><?= date('M d, Y', strtotime($usr['created_at'])) ?></td>
+                                    <td class="p-3 text-right">
                                         <?php if ($usr['id'] !== $_SESSION['user_id']): ?>
-                                            <a href="settings?action=delete_user&id=<?= $usr['id'] ?>" class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="return confirm('Are you sure you want to permanently delete this user account?')">Delete</a>
+                                            <div class="inline-flex gap-1.5">
+                                                <button class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 cursor-pointer" onclick='openEditUserMode(<?= json_encode($usr) ?>)'>Edit</button>
+                                                <a href="settings?action=delete_user&id=<?= $usr['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="bg-bg-surface-solid border border-border-custom hover:border-danger/30 hover:bg-danger/10 text-text-secondary hover:text-danger font-semibold text-xs px-2.5 py-1.5 rounded transition-all duration-150 text-center" onclick="return confirm('Are you sure you want to permanently delete this user account?')" style="text-decoration: none;">Delete</a>
+                                            </div>
                                         <?php else: ?>
-                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Active Session</span>
+                                            <span class="text-xs text-text-muted italic pr-2">Active Session</span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -607,67 +973,112 @@ render_header('Settings & Administration', 'settings');
 </div>
 
 <!-- Tab 4: Site Settings -->
-<div id="tabContent-system" class="settings-tab-content <?= $active_tab === 'system' ? 'active' : '' ?>">
-    <div style="max-width: 40rem; margin: 0 auto;">
-        <div class="card-panel">
-            <div class="panel-header">
-                <h2 class="panel-title" style="display: flex; align-items: center; gap: 0.5rem;">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    Configure Application Settings
-                </h2>
+<div id="tabContent-system" class="settings-tab-content <?= $active_tab === 'system' ? 'block' : 'hidden' ?>">
+    <div class="max-w-[640px] mx-auto bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 sm:p-8">
+        <div class="flex justify-between items-center mb-6 border-b border-border-custom pb-3">
+            <h2 class="font-heading font-bold text-base sm:text-lg text-white flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Configure Application Settings
+            </h2>
+        </div>
+        
+        <form method="POST" action="settings?action=update_settings" enctype="multipart/form-data" class="flex flex-col gap-4">
+            <?php render_csrf_input(); ?>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                    <label for="setSystemName" class="text-xs font-semibold text-text-secondary">System Name</label>
+                    <input type="text" name="system_name" id="setSystemName" required value="<?= htmlspecialchars($GLOBALS['site_settings']['system_name'] ?? '') ?>" placeholder="e.g. BYC DATA CENTER" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                
+                <div class="flex flex-col gap-1.5">
+                    <label for="setOrgName" class="text-xs font-semibold text-text-secondary">Organization Name</label>
+                    <input type="text" name="organization_name" id="setOrgName" required value="<?= htmlspecialchars($GLOBALS['site_settings']['organization_name'] ?? '') ?>" placeholder="e.g. Beersheba Youth Church" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
             </div>
-            
-            <form method="POST" action="settings?action=update_settings">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="setSystemName">System Name</label>
-                        <input type="text" name="system_name" id="setSystemName" required value="<?= htmlspecialchars($GLOBALS['site_settings']['system_name'] ?? '') ?>" placeholder="e.g. BYC DATA CENTER">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="setOrgName">Organization Name</label>
-                        <input type="text" name="organization_name" id="setOrgName" required value="<?= htmlspecialchars($GLOBALS['site_settings']['organization_name'] ?? '') ?>" placeholder="e.g. Beersheba Youth Church">
-                    </div>
-                </div>
 
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="setContactEmail">Contact Email</label>
-                        <input type="email" name="contact_email" id="setContactEmail" value="<?= htmlspecialchars($GLOBALS['site_settings']['contact_email'] ?? '') ?>" placeholder="e.g. info@byc.org">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="setContactPhone">Contact Phone</label>
-                        <input type="text" name="contact_phone" id="setContactPhone" value="<?= htmlspecialchars($GLOBALS['site_settings']['contact_phone'] ?? '') ?>" placeholder="e.g. 0241112222">
-                    </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                    <label for="setContactEmail" class="text-xs font-semibold text-text-secondary">Contact Email</label>
+                    <input type="email" name="contact_email" id="setContactEmail" value="<?= htmlspecialchars($GLOBALS['site_settings']['contact_email'] ?? '') ?>" placeholder="e.g. info@byc.org" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
-
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="setCurrency">Currency Symbol</label>
-                        <input type="text" name="currency" id="setCurrency" value="<?= htmlspecialchars($GLOBALS['site_settings']['currency'] ?? '') ?>" placeholder="e.g. GH₵, $">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="setTimezone">Timezone</label>
-                        <select name="timezone" id="setTimezone">
-                            <?php
-                            $timezones = ['Africa/Accra', 'Africa/Lagos', 'Africa/Nairobi', 'UTC', 'Europe/London', 'America/New_York'];
-                            $current_tz = $GLOBALS['site_settings']['timezone'] ?? 'Africa/Accra';
-                            foreach ($timezones as $tz):
-                                $selected = $tz === $current_tz ? 'selected' : '';
-                                echo "<option value=\"" . htmlspecialchars($tz) . "\" $selected>" . htmlspecialchars($tz) . "</option>";
-                            endforeach;
-                            ?>
-                        </select>
-                    </div>
+                
+                <div class="flex flex-col gap-1.5">
+                    <label for="setContactPhone" class="text-xs font-semibold text-text-secondary">Contact Phone</label>
+                    <input type="text" name="contact_phone" id="setContactPhone" value="<?= htmlspecialchars($GLOBALS['site_settings']['contact_phone'] ?? '') ?>" placeholder="e.g. 0241112222" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
                 </div>
+            </div>
 
-                <button type="submit" class="btn btn-success" style="margin-top: 1.5rem; width: 100%; justify-content: center;">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right: 0.25rem;"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                    Save Site Settings
-                </button>
-            </form>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                    <label for="setCurrency" class="text-xs font-semibold text-text-secondary">Currency Symbol</label>
+                    <input type="text" name="currency" id="setCurrency" value="<?= htmlspecialchars($GLOBALS['site_settings']['currency'] ?? '') ?>" placeholder="e.g. GH₵, $" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                
+                <div class="flex flex-col gap-1.5">
+                    <label for="setTimezone" class="text-xs font-semibold text-text-secondary">Timezone</label>
+                    <select name="timezone" id="setTimezone" class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                        <?php
+                        $timezones = ['Africa/Accra', 'Africa/Lagos', 'Africa/Nairobi', 'UTC', 'Europe/London', 'America/New_York'];
+                        $current_tz = $GLOBALS['site_settings']['timezone'] ?? 'Africa/Accra';
+                        foreach ($timezones as $tz):
+                            $selected = $tz === $current_tz ? 'selected' : '';
+                            echo "<option value=\"" . htmlspecialchars($tz) . "\" $selected>" . htmlspecialchars($tz) . "</option>";
+                        endforeach;
+                        ?>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-success hover:bg-opacity-90 text-white font-semibold text-sm py-2.5 px-4 rounded shadow-md active:scale-98 transition-all duration-150 cursor-pointer flex justify-center items-center gap-1.5 mt-4">
+                <svg class="w-4 h-4 mr-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                Save Site Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Tab 5: Audit Logs Viewer -->
+<div id="tabContent-audit" class="settings-tab-content <?= $active_tab === 'audit' ? 'block' : 'hidden' ?>">
+    <div class="bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 sm:p-7 overflow-x-auto">
+        <div class="flex justify-between items-center mb-6 border-b border-border-custom pb-3">
+            <h2 class="font-heading font-bold text-base sm:text-lg text-white">Database Transaction & Audit Trail</h2>
+        </div>
+        <div class="w-full max-w-full max-h-[35rem] overflow-y-auto pr-1">
+            <?php if (empty($audit_logs)): ?>
+                <p class="text-text-muted text-xs text-center py-8">No audit trail events recorded yet.</p>
+            <?php else: ?>
+                <table class="w-full border-collapse text-left min-w-[750px]">
+                    <thead>
+                        <tr class="border-b border-border-custom">
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">User (Admin)</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Action Taken</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Table</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Target ID</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Payload / Details</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($audit_logs as $log): ?>
+                            <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                <td class="p-3">
+                                    <strong class="text-sm text-white block leading-snug"><?= htmlspecialchars($log['user_name'] ?: 'System') ?></strong>
+                                    <div class="text-2xs text-text-muted mt-0.5">@<?= htmlspecialchars($log['username'] ?: 'system') ?></div>
+                                </td>
+                                <td class="p-3">
+                                    <span class="inline-block border text-3xs px-2 py-0.5 rounded font-semibold bg-primary/10 border-primary/35 text-primary uppercase tracking-wide"><?= htmlspecialchars($log['action']) ?></span>
+                                </td>
+                                <td class="p-3 text-xs font-mono text-text-secondary"><code><?= htmlspecialchars($log['target_table']) ?></code></td>
+                                <td class="p-3 text-sm text-text-primary"><?= $log['target_id'] ?: '<span class="text-text-muted">N/A</span>' ?></td>
+                                <td class="p-3 text-xs font-mono text-text-secondary max-w-[240px] truncate" title="<?= htmlspecialchars($log['details'] ?? '') ?>">
+                                    <?= htmlspecialchars($log['details'] ?? '') ?>
+                                </td>
+                                <td class="p-3 text-xs text-text-muted font-medium"><?= date('Y-m-d H:i:s', strtotime($log['created_at'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -675,19 +1086,27 @@ render_header('Settings & Administration', 'settings');
 <script>
 function switchTab(tabName) {
     // Hide all tab contents
-    document.querySelectorAll('.settings-tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-content').forEach(el => {
+        el.classList.add('hidden');
+        el.classList.remove('block');
+    });
     // Un-activate all tab buttons
-    document.querySelectorAll('.settings-tab-btn').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-btn').forEach(el => {
+        el.classList.remove('text-primary!', 'border-b-primary!');
+    });
     
     // Show active content and activate button
     const activeContent = document.getElementById('tabContent-' + tabName);
-    if (activeContent) activeContent.classList.add('active');
+    if (activeContent) {
+        activeContent.classList.remove('hidden');
+        activeContent.classList.add('block');
+    }
     
     // Find button to activate
     const buttons = document.querySelectorAll('.settings-tab-btn');
     buttons.forEach(btn => {
         if (btn.textContent.trim().toLowerCase().includes(tabName.toLowerCase())) {
-            btn.classList.add('active');
+            btn.classList.add('text-primary!', 'border-b-primary!');
         }
     });
 
@@ -716,7 +1135,8 @@ function openEditUserMode(user) {
     passInput.placeholder = 'Enter new password or leave blank...';
     passInput.value = '';
     
-    cancelBtn.style.display = 'block';
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.classList.add('inline-flex');
     submitBtn.textContent = 'Update User';
 }
 
@@ -738,8 +1158,147 @@ function resetUserForm() {
     passInput.required = true;
     passInput.placeholder = 'Enter password...';
     
-    cancelBtn.style.display = 'none';
+    cancelBtn.classList.add('hidden');
+    cancelBtn.classList.remove('inline-flex');
     submitBtn.textContent = 'Save User';
+}
+
+function openEditSrvMode(srv) {
+    const title = document.getElementById('srvFormTitle');
+    const form = document.getElementById('srvForm');
+    const cancelBtn = document.getElementById('srvCancelBtn');
+    const submitBtn = document.getElementById('srvSubmitBtn');
+    
+    title.textContent = 'Edit Service Type';
+    form.action = 'settings?action=edit_service';
+    
+    document.getElementById('formSrvId').value = srv.id;
+    document.getElementById('srvName').value = srv.name || '';
+    document.getElementById('srvDesc').value = srv.description || '';
+    
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.classList.add('inline-flex');
+    submitBtn.textContent = 'Update Service Type';
+}
+
+function resetSrvForm() {
+    const title = document.getElementById('srvFormTitle');
+    const form = document.getElementById('srvForm');
+    const cancelBtn = document.getElementById('srvCancelBtn');
+    const submitBtn = document.getElementById('srvSubmitBtn');
+    
+    form.reset();
+    title.textContent = 'Add Service Type';
+    form.action = 'settings?action=add_service';
+    document.getElementById('formSrvId').value = '';
+    
+    cancelBtn.classList.add('hidden');
+    cancelBtn.classList.remove('inline-flex');
+    submitBtn.textContent = 'Save Service Type';
+}
+
+function openEditDeptMode(dept) {
+    const title = document.getElementById('deptFormTitle');
+    const form = document.getElementById('deptForm');
+    const cancelBtn = document.getElementById('deptCancelBtn');
+    const submitBtn = document.getElementById('deptSubmitBtn');
+    
+    title.textContent = 'Edit Department';
+    form.action = 'settings?action=edit_dept';
+    
+    document.getElementById('formDeptId').value = dept.id;
+    document.getElementById('deptName').value = dept.name || '';
+    document.getElementById('deptDesc').value = dept.description || '';
+    
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.classList.add('inline-flex');
+    submitBtn.textContent = 'Update Department';
+}
+
+function resetDeptForm() {
+    const title = document.getElementById('deptFormTitle');
+    const form = document.getElementById('deptForm');
+    const cancelBtn = document.getElementById('deptCancelBtn');
+    const submitBtn = document.getElementById('deptSubmitBtn');
+    
+    form.reset();
+    title.textContent = 'Create Department';
+    form.action = 'settings?action=add_dept';
+    document.getElementById('formDeptId').value = '';
+    
+    cancelBtn.classList.add('hidden');
+    cancelBtn.classList.remove('inline-flex');
+    submitBtn.textContent = 'Save Department';
+}
+
+function openEditCellMode(cell) {
+    const title = document.getElementById('cellFormTitle');
+    const form = document.getElementById('cellForm');
+    const cancelBtn = document.getElementById('cellCancelBtn');
+    const submitBtn = document.getElementById('cellSubmitBtn');
+    
+    title.textContent = 'Edit Cell Group';
+    form.action = 'settings?action=edit_cell';
+    
+    document.getElementById('formCellId').value = cell.id;
+    document.getElementById('cellName').value = cell.name || '';
+    document.getElementById('cellLeader').value = cell.leader_id || '';
+    document.getElementById('cellLocation').value = cell.location || '';
+    document.getElementById('cellDay').value = cell.meeting_day || '';
+    
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.classList.add('inline-flex');
+    submitBtn.textContent = 'Update Cell Group';
+}
+
+function resetCellForm() {
+    const title = document.getElementById('cellFormTitle');
+    const form = document.getElementById('cellForm');
+    const cancelBtn = document.getElementById('cellCancelBtn');
+    const submitBtn = document.getElementById('cellSubmitBtn');
+    
+    form.reset();
+    title.textContent = 'Create Cell Group';
+    form.action = 'settings?action=add_cell';
+    document.getElementById('formCellId').value = '';
+    
+    cancelBtn.classList.add('hidden');
+    cancelBtn.classList.remove('inline-flex');
+    submitBtn.textContent = 'Save Cell Group';
+}
+
+function openEditHouseMode(house) {
+    const title = document.getElementById('houseFormTitle');
+    const form = document.getElementById('houseForm');
+    const cancelBtn = document.getElementById('houseCancelBtn');
+    const submitBtn = document.getElementById('houseSubmitBtn');
+    
+    title.textContent = 'Edit Household';
+    form.action = 'settings?action=edit_household';
+    
+    document.getElementById('formHouseId').value = house.id;
+    document.getElementById('houseName').value = house.name || '';
+    document.getElementById('houseAddress').value = house.address || '';
+    
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.classList.add('inline-flex');
+    submitBtn.textContent = 'Update Household';
+}
+
+function resetHouseForm() {
+    const title = document.getElementById('houseFormTitle');
+    const form = document.getElementById('houseForm');
+    const cancelBtn = document.getElementById('houseCancelBtn');
+    const submitBtn = document.getElementById('houseSubmitBtn');
+    
+    form.reset();
+    title.textContent = 'Create Household';
+    form.action = 'settings?action=add_household';
+    document.getElementById('formHouseId').value = '';
+    
+    cancelBtn.classList.add('hidden');
+    cancelBtn.classList.remove('inline-flex');
+    submitBtn.textContent = 'Save Household';
 }
 </script>
 

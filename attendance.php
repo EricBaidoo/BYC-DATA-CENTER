@@ -30,6 +30,7 @@ if (!empty($active_session_id)) {
 
 // 1. Handle Updating Active Session Attendance
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save_active') {
+    validate_csrf();
     if (empty($active_session_id) || !$active_session) {
         $error = 'No active service session is running.';
     } else {
@@ -37,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         try {
             $pdo->beginTransaction();
 
-            // Fetch all current members
-            $members = $pdo->query("SELECT id FROM members")->fetchAll(PDO::FETCH_COLUMN);
+            // Fetch all active members
+            $members = $pdo->query("SELECT id FROM members WHERE deleted_at IS NULL")->fetchAll(PDO::FETCH_COLUMN);
 
             // Re-populate all statuses (clear and insert)
             $stmt_del = $pdo->prepare("DELETE FROM member_attendance WHERE attendance_id = ?");
@@ -51,6 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
             }
 
             $pdo->commit();
+            
+            log_audit_action('SAVE_ATTENDANCE', 'attendance', $active_session_id, json_encode([
+                'present_count' => count($present_member_ids)
+            ]));
+
             header("Location: attendance?msg=Active session attendance updated successfully");
             exit;
         } catch (Exception $e) {
@@ -77,12 +83,12 @@ if (isset($_GET['view_id'])) {
 
     if ($selected_session) {
         $stmt = $pdo->prepare("
-            SELECT m.name, d.name as dept_name, ma.status
+            SELECT CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')) as name, d.name as dept_name, ma.status
             FROM member_attendance ma
             JOIN members m ON ma.member_id = m.id
             LEFT JOIN departments d ON m.department_id = d.id
             WHERE ma.attendance_id = ?
-            ORDER BY m.name ASC
+            ORDER BY m.first_name ASC, m.last_name ASC
         ");
         $stmt->execute([$view_id]);
         $selected_attendance_details = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -96,8 +102,8 @@ if (isset($_GET['msg'])) {
 // Fetch all defined services
 $services = $pdo->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch all members for the logging checklist
-$all_members = $pdo->query("SELECT id, name, gender FROM members ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch all active members for the logging checklist
+$all_members = $pdo->query("SELECT id, CONCAT(first_name, ' ', COALESCE(last_name, '')) as name, gender FROM members WHERE deleted_at IS NULL ORDER BY first_name ASC, last_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch service session attendance history with counts
 $history = $pdo->query("
@@ -116,60 +122,60 @@ render_header('Service Attendance Tracker', 'attendance');
 
 <!-- Action Status Alert -->
 <?php if (!empty($error)): ?>
-    <div style="background: var(--danger-glow); border: 0.0625rem solid var(--danger); color: var(--danger); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+    <div class="bg-danger/15 border border-danger text-danger p-4 rounded-md mb-6 text-sm font-semibold">
         <?= htmlspecialchars($error) ?>
     </div>
 <?php endif; ?>
 <?php if (!empty($success)): ?>
-    <div style="background: var(--secondary-glow); border: 0.0625rem solid var(--secondary); color: var(--secondary); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+    <div class="bg-secondary/15 border border-secondary text-secondary p-4 rounded-md mb-6 text-sm font-semibold">
         <?= htmlspecialchars($success) ?>
     </div>
 <?php endif; ?>
 
 <!-- Two-Column Layout -->
-<div class="dashboard-grid">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     
-    <!-- Left Column: Sessions History -->
-    <div class="card-panel">
-        <div class="panel-header">
-            <h2 class="panel-title">Attendance Service History</h2>
+    <!-- Left Column: Sessions History (2 cols on large screen) -->
+    <div class="lg:col-span-2 bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 sm:p-7">
+        <div class="flex justify-between items-center mb-6 border-b border-border-custom pb-3">
+            <h2 class="font-heading font-bold text-lg text-white">Attendance Service History</h2>
         </div>
-        <div class="table-container">
+        <div class="overflow-x-auto w-full max-w-full">
             <?php if (empty($history)): ?>
-                <p style="color: var(--text-muted); text-align: center; padding: 3rem 0;">No services have been logged yet.</p>
+                <p class="text-text-muted text-center py-12">No services have been logged yet.</p>
             <?php else: ?>
-                <table>
+                <table class="w-full border-collapse text-left min-w-[500px]">
                     <thead>
-                        <tr>
-                            <th>Service Title & Date</th>
-                            <th class="hide-mobile">Present</th>
-                            <th class="hide-mobile">Total Members</th>
-                            <th>Attendance Rate</th>
-                            <th style="text-align: right;">Action</th>
+                        <tr class="border-b border-border-custom">
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Service Title & Date</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider hide-mobile">Present</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider hide-mobile">Total Members</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Attendance Rate</th>
+                            <th class="p-3 text-xs font-semibold text-text-secondary uppercase tracking-wider text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($history as $row): 
                             $percent = $row['total_count'] > 0 ? round(($row['present_count'] / $row['total_count']) * 100) : 0;
-                            $rate_class = 'badge-danger';
+                            $rate_class = 'bg-danger/10 border-danger/35 text-danger';
                             if ($percent >= 75) {
-                                $rate_class = 'badge-success';
+                                $rate_class = 'bg-secondary/10 border-secondary/35 text-secondary';
                             } elseif ($percent >= 50) {
-                                $rate_class = 'badge-warning';
+                                $rate_class = 'bg-warning/10 border-warning/35 text-warning';
                             }
                         ?>
-                            <tr>
-                                <td>
-                                    <strong><?= htmlspecialchars($row['title']) ?></strong>
-                                    <div style="font-size: 0.75rem; color: var(--text-muted);"><?= date('M d, Y', strtotime($row['date'])) ?></div>
+                            <tr class="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all">
+                                <td class="p-3">
+                                    <strong class="text-sm text-white block leading-snug"><?= htmlspecialchars($row['title']) ?></strong>
+                                    <span class="text-xs text-text-muted"><?= date('M d, Y', strtotime($row['date'])) ?></span>
                                 </td>
-                                <td class="hide-mobile"><?= $row['present_count'] ?></td>
-                                <td class="hide-mobile"><?= $row['total_count'] ?></td>
-                                <td>
-                                    <span class="badge <?= $rate_class ?>"><?= $percent ?>%</span>
+                                <td class="p-3 text-sm text-text-primary hide-mobile"><?= $row['present_count'] ?></td>
+                                <td class="p-3 text-sm text-text-primary hide-mobile"><?= $row['total_count'] ?></td>
+                                <td class="p-3">
+                                    <span class="inline-block border text-2xs px-2 py-0.5 rounded font-semibold <?= $rate_class ?>"><?= $percent ?>%</span>
                                 </td>
-                                <td style="text-align: right;">
-                                    <a href="attendance?view_id=<?= $row['id'] ?>" class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;">Details</a>
+                                <td class="p-3 text-right">
+                                    <a href="attendance?view_id=<?= $row['id'] ?>" class="inline-block bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-3 py-1.5 rounded transition-all duration-150">Details</a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -179,61 +185,63 @@ render_header('Service Attendance Tracker', 'attendance');
         </div>
     </div>
 
-    <!-- Right Column: Form Panel (Session Logger & Service Directory) -->
-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Right Column: Form Panel (1 col) -->
+    <div class="flex flex-col gap-6">
         
         <!-- Active Session Attendance Panel -->
         <?php if ($active_session): ?>
-            <div class="card-panel">
-                <div class="panel-header">
-                    <h2 class="panel-title">Take Attendance</h2>
+            <div class="bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 sm:p-7">
+                <div class="flex justify-between items-center mb-5 border-b border-border-custom pb-3">
+                    <h2 class="font-heading font-bold text-lg text-white">Take Attendance</h2>
                 </div>
                 
-                <div style="background: rgba(6, 182, 212, 0.08); border: 0.0625rem solid var(--secondary); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem;">
-                    <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.15rem;">Active Service Session</div>
-                    <strong style="font-size: 1.1rem; color: var(--text-primary);"><?= htmlspecialchars($active_session['service_name']) ?></strong>
-                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;"><?= date('l, M d, Y', strtotime($active_session['date'])) ?></div>
+                <div class="bg-secondary/10 border border-secondary/35 p-4 rounded-md mb-5">
+                    <div class="text-3xs text-secondary font-extrabold uppercase tracking-widest mb-1">Active Service Session</div>
+                    <strong class="text-sm sm:text-base text-white block leading-snug"><?= htmlspecialchars($active_session['service_name']) ?></strong>
+                    <div class="text-2xs text-text-muted mt-0.5"><?= date('l, M d, Y', strtotime($active_session['date'])) ?></div>
                 </div>
 
                 <?php if (empty($all_members)): ?>
-                    <p style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">Register members in the directory to mark attendance.</p>
+                    <p class="text-text-muted text-xs text-center py-8">Register members in the directory to mark attendance.</p>
                 <?php else: ?>
-                    <form method="POST" action="attendance?action=save_active">
-                        <div class="attendance-sheet-header">
-                            <label>Attendance Sheet (Check who is Present)</label>
-                            <label class="checkbox-custom" style="font-size: 0.8rem;">
-                                <input type="checkbox" id="toggleAllMembers">
-                                <span class="checkbox-indicator"></span> Select All
+                    <form method="POST" action="attendance?action=save_active" class="flex flex-col gap-4">
+                        <?php render_csrf_input(); ?>
+                        <div class="flex justify-between items-center gap-4 mt-2">
+                            <label class="text-xs font-semibold text-text-secondary">Attendance Sheet (Present)</label>
+                            <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-text-secondary select-none">
+                                <input type="checkbox" id="toggleAllMembers" class="w-4 h-4 rounded border-white/10 bg-black/30 text-secondary checked:bg-secondary checked:border-secondary focus:ring-offset-0 focus:ring-2 focus:ring-secondary/30 transition-all cursor-pointer">
+                                <span>Select All</span>
                             </label>
                         </div>
 
-                        <div class="form-group" style="margin-bottom: 0.75rem;">
-                            <input type="text" id="attendanceMemberSearch" placeholder="🔍 Type name to filter attendance list..." class="search-input" style="height: auto; padding: 0.5rem 0.75rem; font-size: 0.85rem; border-color: var(--border-color);">
+                        <div>
+                            <input type="text" id="attendanceMemberSearch" placeholder="Type name to filter list..." class="w-full bg-black/30 border border-white/10 rounded-md px-3.5 py-2 text-white placeholder-text-muted focus:border-secondary focus:ring-4 focus:ring-secondary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-xs">
                         </div>
 
-                        <div class="attendance-list-container" style="margin-bottom: 1.5rem; max-height: 20rem;">
+                        <div class="flex flex-col gap-1 border border-border-custom rounded-md p-2 bg-black/20 max-h-[20rem] overflow-y-auto pr-1">
                             <?php foreach ($all_members as $m): ?>
-                                <div class="attendance-member-row">
-                                    <label class="checkbox-custom">
-                                        <input type="checkbox" class="member-checkbox" name="present_members[]" value="<?= $m['id'] ?>" <?= in_array($m['id'], $active_present_members) ? 'checked' : '' ?>>
-                                        <span class="checkbox-indicator"></span>
-                                        <span style="font-size: 0.9rem; font-weight: 500;"><?= htmlspecialchars($m['name']) ?></span>
+                                <div class="attendance-member-row flex items-center justify-between p-2 border-b border-white/[0.02] last:border-b-0 hover:bg-white/[0.02] rounded transition-all duration-150">
+                                    <label class="flex items-center gap-3 cursor-pointer select-none">
+                                        <input type="checkbox" class="member-checkbox w-4 h-4 rounded border-white/10 bg-black/30 text-secondary checked:bg-secondary checked:border-secondary focus:ring-offset-0 focus:ring-2 focus:ring-secondary/30 transition-all cursor-pointer" name="present_members[]" value="<?= $m['id'] ?>" <?= in_array($m['id'], $active_present_members) ? 'checked' : '' ?>>
+                                        <span class="text-xs font-medium text-white"><?= htmlspecialchars($m['name']) ?></span>
                                     </label>
-                                    <span style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($m['gender']) ?></span>
+                                    <span class="text-3xs text-text-muted font-medium pr-1"><?= htmlspecialchars($m['gender']) ?></span>
                                 </div>
                             <?php endforeach; ?>
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Save Attendance Changes</button>
+                        <button type="submit" class="w-full bg-primary hover:bg-opacity-90 text-white font-semibold text-sm py-2.5 px-4 rounded shadow-md active:scale-98 transition-all duration-150 cursor-pointer flex justify-center items-center">Save Attendance Changes</button>
                     </form>
                 <?php endif; ?>
             </div>
         <?php else: ?>
-            <div style="background: rgba(255, 255, 255, 0.02); border: 0.0625rem solid var(--border-color); padding: 2rem; border-radius: var(--radius-sm); text-align: center;">
-                <svg width="40" height="40" fill="none" stroke="var(--text-muted)" stroke-width="2" viewBox="0 0 24 24" style="margin-bottom: 1rem; opacity: 0.6;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">No Active Service Session</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; max-width: 16rem; margin-left: auto; margin-right: auto;">You must start an active service session in the Settings panel before taking member attendance.</p>
-                <a href="settings?tab=sessions" class="btn btn-primary" style="display: inline-flex; justify-content: center; width: auto; padding: 0.5rem 1.25rem;">Go to Settings</a>
+            <div class="bg-white/[0.015] border border-border-custom p-8 rounded-xl text-center flex flex-col items-center justify-center gap-3">
+                <div class="w-12 h-12 bg-white/[0.03] border border-border-custom rounded-full flex items-center justify-center text-text-muted mb-2">
+                    <svg class="w-6 h-6 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <h3 class="text-sm sm:text-base font-bold text-white">No Active Service Session</h3>
+                <p class="text-xs text-text-muted max-w-[240px] leading-relaxed">You must start an active service session in the Settings panel before taking member attendance.</p>
+                <a href="settings?tab=sessions" class="bg-primary hover:bg-opacity-90 text-white font-semibold text-xs px-4 py-2 rounded shadow-md active:scale-95 transition-all duration-150 flex items-center justify-center gap-1.5 mt-2">Go to Settings</a>
             </div>
         <?php endif; ?>
     </div>
@@ -241,36 +249,36 @@ render_header('Service Attendance Tracker', 'attendance');
 
 <!-- View Details Drawer/Modal -->
 <?php if ($selected_session): ?>
-    <div class="modal-overlay active" id="detailsModal">
-        <div class="modal-container" style="max-width: 31.25rem;">
-            <div class="modal-header">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1000] transition-all duration-300" id="detailsModal">
+        <div class="bg-bg-surface-solid border border-border-custom rounded-2xl w-full max-w-[480px] p-6 shadow-2xl flex flex-col max-h-[90vh] transition-all duration-300">
+            <div class="flex justify-between items-center mb-5 border-b border-border-custom pb-3">
                 <div>
-                    <h2 class="panel-title"><?= htmlspecialchars($selected_session['title']) ?></h2>
-                    <p style="font-size: 0.8rem; color: var(--text-muted);"><?= date('l, M d, Y', strtotime($selected_session['date'])) ?></p>
+                    <h2 class="font-heading font-bold text-base sm:text-lg text-white"><?= htmlspecialchars($selected_session['title']) ?></h2>
+                    <p class="text-2xs text-text-muted mt-0.5"><?= date('l, M d, Y', strtotime($selected_session['date'])) ?></p>
                 </div>
-                <a href="attendance" class="modal-close" style="text-decoration: none;">&times;</a>
+                <a href="attendance" class="text-2xl text-text-muted hover:text-white bg-none border-none p-0 cursor-pointer text-center leading-none" style="text-decoration: none;">&times;</a>
             </div>
             
-            <div class="attendance-list-container" style="max-height: 25rem; border-color: var(--border-color);">
+            <div class="flex flex-col gap-1 border border-border-custom rounded-md p-2 bg-black/20 overflow-y-auto max-h-[22rem] pr-1">
                 <?php foreach ($selected_attendance_details as $detail): ?>
-                    <div class="attendance-member-row">
+                    <div class="flex items-center justify-between p-2 border-b border-white/[0.02] last:border-b-0">
                         <div>
-                            <strong><?= htmlspecialchars($detail['name']) ?></strong>
-                            <div style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($detail['dept_name'] ?? 'No Department') ?></div>
+                            <strong class="text-xs sm:text-sm text-white font-medium block leading-snug"><?= htmlspecialchars($detail['name']) ?></strong>
+                            <span class="text-3xs text-text-muted"><?= htmlspecialchars($detail['dept_name'] ?? 'No Department') ?></span>
                         </div>
                         <div>
                             <?php if ($detail['status'] === 'Present'): ?>
-                                <span class="badge badge-success">Present</span>
+                                <span class="border text-3xs px-2 py-0.5 rounded font-semibold bg-secondary/10 border-secondary/35 text-secondary">Present</span>
                             <?php else: ?>
-                                <span class="badge badge-danger">Absent</span>
+                                <span class="border text-3xs px-2 py-0.5 rounded font-semibold bg-danger/10 border-danger/35 text-danger">Absent</span>
                             <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
             
-            <div class="modal-footer">
-                <a href="attendance" class="btn btn-secondary">Close</a>
+            <div class="flex justify-end border-t border-border-custom pt-4 mt-4 flex-shrink-0">
+                <a href="attendance" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2 rounded transition-all duration-150 text-center" style="text-decoration: none;">Close</a>
             </div>
         </div>
     </div>

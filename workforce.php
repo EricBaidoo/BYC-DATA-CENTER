@@ -9,6 +9,7 @@ $success = '';
 // Handle Actions (Edit Department Inline)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_GET['action'])) {
+        validate_csrf();
         $action = $_GET['action'];
         $name = trim($_POST['name'] ?? '');
         $description = trim($_POST['description'] ?? '');
@@ -24,6 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try {
                         $stmt = $pdo->prepare("UPDATE departments SET name = ?, description = ? WHERE id = ?");
                         $stmt->execute([$name, $description, $id]);
+                        
+                        log_audit_action('EDIT_DEPARTMENT', 'departments', $id, json_encode([
+                            'name' => $name
+                        ]));
+
                         header("Location: workforce?msg=Department updated successfully");
                         exit;
                     } catch (PDOException $e) {
@@ -43,7 +49,7 @@ if (isset($_GET['msg'])) {
 $depts = $pdo->query("
     SELECT d.*, COUNT(m.id) as member_count 
     FROM departments d
-    LEFT JOIN members m ON d.id = m.department_id
+    LEFT JOIN members m ON d.id = m.department_id AND m.deleted_at IS NULL
     GROUP BY d.id
     ORDER BY d.name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
@@ -51,7 +57,7 @@ $depts = $pdo->query("
 // Fetch members grouped by department
 $dept_members = [];
 foreach ($depts as $dept) {
-    $stmt = $pdo->prepare("SELECT id, name, phone, email, gender FROM members WHERE department_id = ? ORDER BY name ASC");
+    $stmt = $pdo->prepare("SELECT id, CONCAT(first_name, ' ', COALESCE(last_name, '')) as name, phone, email, gender FROM members WHERE department_id = ? AND deleted_at IS NULL ORDER BY first_name ASC, last_name ASC");
     $stmt->execute([$dept['id']]);
     $dept_members[$dept['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -61,57 +67,57 @@ render_header('Workforce Departments', 'workforce');
 
 <!-- Action Status Alert -->
 <?php if (!empty($error)): ?>
-    <div style="background: var(--danger-glow); border: 0.0625rem solid var(--danger); color: var(--danger); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+    <div class="bg-danger/15 border border-danger text-danger p-4 rounded-md mb-6 text-sm font-semibold">
         <?= htmlspecialchars($error) ?>
     </div>
 <?php endif; ?>
 <?php if (!empty($success)): ?>
-    <div style="background: var(--secondary-glow); border: 0.0625rem solid var(--secondary); color: var(--secondary); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+    <div class="bg-secondary/15 border border-secondary text-secondary p-4 rounded-md mb-6 text-sm font-semibold">
         <?= htmlspecialchars($success) ?>
     </div>
 <?php endif; ?>
 
 <!-- Quick Actions Panel -->
-<div class="card-panel" style="margin-bottom: 2.5rem; display: flex; justify-content: space-between; align-items: center; padding: 1.25rem;">
+<div class="bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div>
-        <h2 class="panel-title" style="margin-bottom: 0.25rem;">Workforce Structure</h2>
-        <p style="font-size: 0.85rem; color: var(--text-secondary);">Manage department cohorts and coordinate active workers. Access <a href="settings?tab=departments" style="color: var(--primary); text-decoration: underline;">Settings page</a> to create or delete departments.</p>
+        <h2 class="font-heading font-bold text-lg text-white">Workforce Structure</h2>
+        <p class="text-xs sm:text-sm text-text-secondary mt-0.5">Manage department cohorts and coordinate active workers. Access the <a href="settings?tab=departments" class="text-primary hover:underline font-semibold">Settings page</a> to create or delete departments.</p>
     </div>
 </div>
 
 <!-- Departments Grid Layout -->
-<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); align-items: start; gap: 2rem;">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
     <?php foreach ($depts as $dept): ?>
-        <div class="card-panel" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; height: 100%;">
+        <div class="bg-bg-surface backdrop-blur-md border border-border-custom rounded-xl p-6 flex flex-col gap-4 h-full hover:border-primary/20 transition-all duration-300">
             
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: white;">
+            <div class="flex justify-between items-start gap-3">
+                <div class="min-w-0">
+                    <h3 class="font-heading font-bold text-base sm:text-lg text-white truncate">
                         <?= htmlspecialchars($dept['name']) ?>
                     </h3>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+                    <p class="text-xs text-text-secondary mt-1 leading-relaxed line-clamp-2" title="<?= htmlspecialchars($dept['description'] ?? '') ?>">
                         <?= htmlspecialchars($dept['description'] ?: 'No description provided.') ?>
                     </p>
                 </div>
-                <span class="badge badge-success"><?= $dept['member_count'] ?> Active</span>
+                <span class="flex-shrink-0 bg-secondary/10 border border-secondary/35 text-secondary text-2xs px-2.5 py-1 rounded font-semibold uppercase tracking-wider"><?= $dept['member_count'] ?> Active</span>
             </div>
 
             <!-- Members list inside department -->
-            <div style="flex-grow: 1; border-top: 0.0625rem solid var(--border-color); padding-top: 0.75rem;">
-                <h4 style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Members Assigned</h4>
+            <div class="flex-grow border-t border-border-custom pt-4">
+                <h4 class="text-2xs font-extrabold text-text-secondary uppercase tracking-widest mb-3">Members Assigned</h4>
                 
-                <div class="activity-list" style="max-height: 12.5rem; overflow-y: auto;">
+                <div class="flex flex-col gap-2.5 max-h-[12.5rem] overflow-y-auto pr-1">
                     <?php if (empty($dept_members[$dept['id']])): ?>
-                        <p style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem 0;">No members assigned to this department.</p>
+                        <p class="text-text-muted text-xs text-center py-6 font-medium">No members assigned.</p>
                     <?php else: ?>
                         <?php foreach ($dept_members[$dept['id']] as $m): 
                             $initials = strtoupper(substr($m['name'], 0, 1));
                         ?>
-                            <div class="activity-item" style="padding: 0.5rem; gap: 0.5rem; background: transparent;">
-                                <div class="activity-avatar" style="width: 1.75rem; height: 1.75rem; font-size: 0.8rem;"><?= htmlspecialchars($initials) ?></div>
-                                <div class="activity-info">
-                                    <div class="activity-name" style="font-size: 0.85rem;"><?= htmlspecialchars($m['name']) ?></div>
-                                    <div class="activity-meta" style="font-size: 0.7rem;"><?= htmlspecialchars($m['phone']) ?></div>
+                            <div class="flex items-center gap-2.5 p-2 bg-white/[0.015] border border-transparent rounded hover:border-border-custom hover:bg-white/[0.04] transition-all">
+                                <div class="w-7 h-7 rounded-full bg-bg-surface-solid flex items-center justify-center font-bold text-xs text-primary border border-border-custom"><?= htmlspecialchars($initials) ?></div>
+                                <div class="min-w-0 flex-grow">
+                                    <div class="text-xs font-semibold text-white truncate"><?= htmlspecialchars($m['name']) ?></div>
+                                    <div class="text-3xs text-text-muted truncate"><?= htmlspecialchars($m['phone'] ?: 'No contact') ?></div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -120,8 +126,8 @@ render_header('Workforce Departments', 'workforce');
             </div>
 
             <!-- Actions footer -->
-            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 0.0625rem solid var(--border-color); padding-top: 0.75rem; margin-top: auto;">
-                <button class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;" onclick='openEditDeptModal(<?= json_encode($dept) ?>)'>Rename / Edit</button>
+            <div class="flex justify-end gap-2 border-t border-border-custom pt-4 mt-auto">
+                <button class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-3 py-1.5 rounded transition-all duration-150 cursor-pointer" onclick='openEditDeptModal(<?= json_encode($dept) ?>)'>Rename / Edit</button>
             </div>
 
         </div>
@@ -129,32 +135,31 @@ render_header('Workforce Departments', 'workforce');
 </div>
 
 <!-- Edit Department Modal Overlay -->
-<div class="modal-overlay" id="deptModal">
-    <div class="modal-container" style="max-width: 28.125rem;">
-        <div class="modal-header">
-            <h2 class="panel-title" id="modalTitle">Edit Department Info</h2>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1000] opacity-0 pointer-events-none transition-all duration-300" id="deptModal">
+    <div class="bg-bg-surface-solid border border-border-custom rounded-2xl w-full max-w-[450px] p-6 shadow-2xl flex flex-col max-h-[90vh] scale-95 opacity-0 transition-all duration-300" id="deptModalContainer">
+        <div class="flex justify-between items-center mb-5">
+            <h2 class="font-heading font-bold text-lg text-white" id="modalTitle">Edit Department Info</h2>
+            <button class="text-2xl text-text-muted hover:text-white bg-none border-none p-0 cursor-pointer" onclick="closeModal()">&times;</button>
         </div>
-        <form id="deptForm" method="POST" action="workforce?action=edit">
+        <form id="deptForm" method="POST" action="workforce?action=edit" class="flex flex-col gap-4 overflow-hidden">
+            <?php render_csrf_input(); ?>
             <input type="hidden" name="id" id="deptId">
             
-            <div class="modal-body">
-                <div class="form-grid" style="grid-template-columns: 1fr;">
-                    <div class="form-group">
-                        <label for="formDeptName">Department Name</label>
-                        <input type="text" name="name" id="formDeptName" required placeholder="e.g. Media & Tech Team">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="formDeptDesc">Description</label>
-                        <textarea name="description" id="formDeptDesc" rows="3" placeholder="Describe the roles and functions of this department..."></textarea>
-                    </div>
+            <div class="overflow-y-auto flex-grow pr-1 flex flex-col gap-4">
+                <div class="flex flex-col gap-1.5">
+                    <label for="formDeptName" class="text-xs font-semibold text-text-secondary">Department Name</label>
+                    <input type="text" name="name" id="formDeptName" required placeholder="e.g. Media & Tech Team" class="w-full bg-black/30 border border-white/10 rounded-md px-4 py-2.5 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm">
+                </div>
+                
+                <div class="flex flex-col gap-1.5">
+                    <label for="formDeptDesc" class="text-xs font-semibold text-text-secondary">Description</label>
+                    <textarea name="description" id="formDeptDesc" rows="3" placeholder="Describe the roles and functions of this department..." class="w-full bg-black/30 border border-white/10 rounded-md px-4 py-2.5 text-white placeholder-text-muted focus:border-primary focus:ring-4 focus:ring-primary/25 focus:bg-black/45 focus:outline-none transition-all duration-200 text-sm"></textarea>
                 </div>
             </div>
             
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="btn btn-success" id="formSubmitBtn">Update Department</button>
+            <div class="flex justify-end gap-3 border-t border-border-custom pt-4 flex-shrink-0">
+                <button type="button" class="bg-bg-surface-solid text-text-primary border border-border-custom hover:bg-border-custom-hover hover:text-white font-semibold text-xs px-4 py-2 rounded transition-all duration-150 cursor-pointer" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="bg-success text-white font-semibold text-xs px-4 py-2 rounded hover:bg-opacity-90 transition-all duration-150 cursor-pointer" id="formSubmitBtn">Update Department</button>
             </div>
         </form>
     </div>
@@ -162,6 +167,7 @@ render_header('Workforce Departments', 'workforce');
 
 <script>
 const modal = document.getElementById('deptModal');
+const container = document.getElementById('deptModalContainer');
 const form = document.getElementById('deptForm');
 const modalTitle = document.getElementById('modalTitle');
 const formSubmitBtn = document.getElementById('formSubmitBtn');
@@ -176,11 +182,13 @@ function openEditDeptModal(dept) {
     document.getElementById('formDeptName').value = dept.name;
     document.getElementById('formDeptDesc').value = dept.description || '';
     
-    modal.classList.add('active');
+    modal.classList.add('opacity-100', 'pointer-events-auto');
+    container.classList.add('scale-100', 'opacity-100');
 }
 
 function closeModal() {
-    modal.classList.remove('active');
+    modal.classList.remove('opacity-100', 'pointer-events-auto');
+    container.classList.remove('scale-100', 'opacity-100');
 }
 
 // Close on escape key
